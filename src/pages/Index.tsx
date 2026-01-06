@@ -36,6 +36,16 @@ export default function Index() {
     }
   }, [user]);
 
+  const fetchNotificationCount = async () => {
+    if (!user) return;
+    const { count } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false);
+    setNotificationCount(count || 0);
+  };
+
   const fetchProfile = async () => {
     if (!user) return;
     
@@ -62,27 +72,6 @@ export default function Index() {
     setLoading(false);
   };
 
-  const fetchCounts = async () => {
-    if (!user) return;
-
-    // Notification count
-    const { count: notifCount } = await supabase
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('is_read', false);
-    
-    setNotificationCount(notifCount || 0);
-
-    // Unread messages count
-    const { count: msgCount } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('receiver_id', user.id)
-      .eq('is_read', false);
-    
-    setMessageCount(msgCount || 0);
-  };
 
   const handlePostCreated = () => {
     fetchPosts();
@@ -93,7 +82,7 @@ export default function Index() {
   };
 
   const handleSelectChat = (friend: Profile) => {
-    setSelectedChat(friend);
+    selectChat(friend);
   };
 
   if (authLoading || loading) {
@@ -112,7 +101,7 @@ export default function Index() {
         profile={profile} 
         notificationCount={notificationCount}
         messageCount={messageCount}
-        onMessagesClick={() => setChatOpen(!chatOpen)}
+        onMessagesClick={toggleChat}
       />
 
       <div className="container mx-auto px-4 py-6">
@@ -169,7 +158,7 @@ export default function Index() {
       {/* Chat Components */}
       <ChatSidebar 
         isOpen={chatOpen}
-        onClose={() => setChatOpen(false)}
+        onClose={closeChat}
         currentUser={profile}
         onSelectChat={handleSelectChat}
         selectedChat={selectedChat}
@@ -179,7 +168,7 @@ export default function Index() {
         <ChatWindow 
           friend={selectedChat}
           currentUser={profile}
-          onClose={() => setSelectedChat(null)}
+          onClose={closeSelectedChat}
         />
       )}
     </div>
