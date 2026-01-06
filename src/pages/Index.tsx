@@ -9,6 +9,7 @@ import PostCard from '@/components/feed/PostCard';
 import FriendsSidebar from '@/components/friends/FriendsSidebar';
 import ChatSidebar from '@/components/chat/ChatSidebar';
 import ChatWindow from '@/components/chat/ChatWindow';
+import { useChat } from '@/hooks/useChat';
 import { Loader2 } from 'lucide-react';
 
 export default function Index() {
@@ -17,10 +18,9 @@ export default function Index() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [selectedChat, setSelectedChat] = useState<Profile | null>(null);
   const [notificationCount, setNotificationCount] = useState(0);
-  const [messageCount, setMessageCount] = useState(0);
+
+  const { chatOpen, selectedChat, messageCount, toggleChat, closeChat, selectChat, closeSelectedChat } = useChat(user?.id);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -32,7 +32,7 @@ export default function Index() {
     if (user) {
       fetchProfile();
       fetchPosts();
-      fetchCounts();
+      fetchNotificationCount();
     }
   }, [user]);
 

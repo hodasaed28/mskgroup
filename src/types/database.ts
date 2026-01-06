@@ -4,6 +4,7 @@ export interface Profile {
   full_name: string | null;
   avatar_url: string | null;
   bio: string | null;
+  is_private: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -13,6 +14,8 @@ export interface Post {
   user_id: string;
   content: string | null;
   image_url: string | null;
+  video_url: string | null;
+  visibility: 'everyone' | 'friends' | 'only_me';
   created_at: string;
   updated_at: string;
   profiles?: Profile;
@@ -62,5 +65,22 @@ export interface Notification {
   content: string;
   reference_id: string | null;
   is_read: boolean;
+  created_at: string;
+}
+
+export interface Reel {
+  id: string;
+  user_id: string;
+  video_url: string;
+  caption: string | null;
+  created_at: string;
+  updated_at: string;
+  profiles?: Profile;
+}
+
+export interface ReelLike {
+  id: string;
+  reel_id: string;
+  user_id: string;
   created_at: string;
 }
