@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Profile, Reel } from '@/types/database';
+import { Reel } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/layout/Header';
-import { useChat } from '@/hooks/useChat';
-import ChatSidebar from '@/components/chat/ChatSidebar';
-import ChatWindow from '@/components/chat/ChatWindow';
+import { useChatContext } from '@/contexts/ChatContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -27,22 +25,19 @@ export default function ReelsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { profile, notificationCount, messageCount, toggleChat } = useChatContext();
   const [reels, setReels] = useState<Reel[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [muted, setMuted] = useState(true);
   const [likes, setLikes] = useState<{ [key: string]: number }>({});
   const [likedReels, setLikedReels] = useState<Set<string>>(new Set());
-  const [notificationCount, setNotificationCount] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [caption, setCaption] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const videoRefs = useRef<{ [key: number]: HTMLVideoElement }>({});
-
-  const { chatOpen, selectedChat, messageCount, toggleChat, closeChat, selectChat, closeSelectedChat } = useChat(user?.id);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -52,9 +47,7 @@ export default function ReelsPage() {
 
   useEffect(() => {
     if (user) {
-      fetchProfile();
       fetchReels();
-      fetchNotificationCount();
     }
   }, [user]);
 
@@ -69,16 +62,6 @@ export default function ReelsPage() {
       }
     });
   }, [currentIndex, reels]);
-
-  const fetchProfile = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    if (data) setProfile(data as unknown as Profile);
-  };
 
   const fetchReels = async () => {
     const { data } = await supabase
@@ -109,16 +92,6 @@ export default function ReelsPage() {
       }
     }
     setLoading(false);
-  };
-
-  const fetchNotificationCount = async () => {
-    if (!user) return;
-    const { count } = await supabase
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('is_read', false);
-    setNotificationCount(count || 0);
   };
 
   const handleLike = async (reelId: string) => {
@@ -424,22 +397,6 @@ export default function ReelsPage() {
           )}
         </div>
       </div>
-
-      <ChatSidebar
-        isOpen={chatOpen}
-        onClose={closeChat}
-        currentUser={profile}
-        onSelectChat={selectChat}
-        selectedChat={selectedChat}
-      />
-
-      {selectedChat && profile && (
-        <ChatWindow
-          friend={selectedChat}
-          currentUser={profile}
-          onClose={closeSelectedChat}
-        />
-      )}
     </div>
   );
 }

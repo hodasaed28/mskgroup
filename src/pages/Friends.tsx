@@ -6,18 +6,19 @@ import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/layout/Header';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Check, X, UserMinus, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useChatContext } from '@/contexts/ChatContext';
 
 export default function FriendsPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { profile, notificationCount, messageCount, toggleChat } = useChatContext();
   const [friends, setFriends] = useState<Profile[]>([]);
   const [requests, setRequests] = useState<Friendship[]>([]);
   const [sentRequests, setSentRequests] = useState<Friendship[]>([]);
@@ -31,25 +32,10 @@ export default function FriendsPage() {
 
   useEffect(() => {
     if (user) {
-      fetchProfile();
       fetchFriends();
       fetchRequests();
     }
   }, [user]);
-
-  const fetchProfile = async () => {
-    if (!user) return;
-    
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    
-    if (data) {
-      setProfile(data as Profile);
-    }
-  };
 
   const fetchFriends = async () => {
     if (!user) return;
@@ -148,9 +134,9 @@ export default function FriendsPage() {
     <div className="min-h-screen bg-background">
       <Header 
         profile={profile} 
-        notificationCount={0}
-        messageCount={0}
-        onMessagesClick={() => {}}
+        notificationCount={notificationCount}
+        messageCount={messageCount}
+        onMessagesClick={toggleChat}
       />
 
       <div className="container mx-auto px-4 py-6 max-w-4xl" dir="rtl">
