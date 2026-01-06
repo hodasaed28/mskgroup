@@ -1,26 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Profile, Post } from '@/types/database';
+import { Post } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/layout/Header';
 import CreatePost from '@/components/feed/CreatePost';
 import PostCard from '@/components/feed/PostCard';
 import FriendsSidebar from '@/components/friends/FriendsSidebar';
-import ChatSidebar from '@/components/chat/ChatSidebar';
-import ChatWindow from '@/components/chat/ChatWindow';
-import { useChat } from '@/hooks/useChat';
+import { useChatContext } from '@/contexts/ChatContext';
 import { Loader2 } from 'lucide-react';
 
 export default function Index() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [notificationCount, setNotificationCount] = useState(0);
 
-  const { chatOpen, selectedChat, messageCount, toggleChat, closeChat, selectChat, closeSelectedChat } = useChat(user?.id);
+  const { profile, notificationCount, messageCount, toggleChat } = useChatContext();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -30,47 +26,9 @@ export default function Index() {
 
   useEffect(() => {
     if (user) {
-      fetchProfile();
       fetchPosts();
-      fetchNotificationCount();
     }
   }, [user]);
-
-  const fetchNotificationCount = async () => {
-    if (!user) return;
-
-    const { count } = await supabase
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('is_read', false);
-
-    setNotificationCount(count || 0);
-  };
-
-  const fetchNotificationCount2 = async () => {
-    if (!user) return;
-    const { count } = await supabase
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('is_read', false);
-    setNotificationCount(count || 0);
-  };
-
-  const fetchProfile = async () => {
-    if (!user) return;
-    
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    
-    if (data) {
-      setProfile(data as Profile);
-    }
-  };
 
   const fetchPosts = async () => {
     const { data } = await supabase
@@ -84,17 +42,12 @@ export default function Index() {
     setLoading(false);
   };
 
-
   const handlePostCreated = () => {
     fetchPosts();
   };
 
   const handlePostDeleted = () => {
     fetchPosts();
-  };
-
-  const handleSelectChat = (friend: Profile) => {
-    selectChat(friend);
   };
 
   if (authLoading || loading) {
@@ -166,23 +119,6 @@ export default function Index() {
           </aside>
         </div>
       </div>
-
-      {/* Chat Components */}
-      <ChatSidebar 
-        isOpen={chatOpen}
-        onClose={closeChat}
-        currentUser={profile}
-        onSelectChat={handleSelectChat}
-        selectedChat={selectedChat}
-      />
-
-      {selectedChat && profile && (
-        <ChatWindow 
-          friend={selectedChat}
-          currentUser={profile}
-          onClose={closeSelectedChat}
-        />
-      )}
     </div>
   );
 }

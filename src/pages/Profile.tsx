@@ -5,6 +5,7 @@ import { Profile, Post } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/layout/Header';
 import PostCard from '@/components/feed/PostCard';
+import { useChatContext } from '@/contexts/ChatContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -18,8 +19,8 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const { profile: currentUserProfile, notificationCount, messageCount, toggleChat, selectChat } = useChatContext();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [friendshipStatus, setFriendshipStatus] = useState<'none' | 'pending' | 'accepted' | 'received'>('none');
@@ -34,7 +35,6 @@ export default function ProfilePage() {
   useEffect(() => {
     if (id && user) {
       fetchProfile();
-      fetchCurrentUserProfile();
       fetchPosts();
       checkFriendship();
     }
@@ -53,20 +53,6 @@ export default function ProfilePage() {
       setProfile(data as Profile);
     }
     setLoading(false);
-  };
-
-  const fetchCurrentUserProfile = async () => {
-    if (!user) return;
-    
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    
-    if (data) {
-      setCurrentUserProfile(data as Profile);
-    }
   };
 
   const fetchPosts = async () => {
@@ -96,6 +82,9 @@ export default function ProfilePage() {
       setFriendshipId(data.id);
       if (data.status === 'accepted') {
         setFriendshipStatus('accepted');
+      } else if (data.status === 'rejected') {
+        // Allow re-sending if rejected
+        setFriendshipStatus('none');
       } else if (data.requester_id === user.id) {
         setFriendshipStatus('pending');
       } else {
@@ -107,32 +96,74 @@ export default function ProfilePage() {
   };
 
   const sendFriendRequest = async () => {
-    if (!user || !id) return;
+    if (!user || !id || !currentUserProfile) return;
 
-    const { error } = await supabase
+    // Check if there's a rejected request and delete it first
+    if (friendshipId) {
+      await supabase
+        .from('friendships')
+        .delete()
+        .eq('id', friendshipId);
+    }
+
+    const { data, error } = await supabase
       .from('friendships')
       .insert({
         requester_id: user.id,
         addressee_id: id,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      // Create notification for the addressee
+      await supabase.rpc('create_notification', {
+        p_user_id: id,
+        p_type: 'friend_request',
+        p_content: `${currentUserProfile.full_name || currentUserProfile.username} أرسل لك طلب صداقة`,
+        p_reference_id: data.id,
       });
 
-    if (!error) {
       toast({ title: 'تم إرسال طلب الصداقة' });
       checkFriendship();
     }
   };
 
   const handleFriendRequest = async (accept: boolean) => {
-    if (!friendshipId) return;
+    if (!friendshipId || !currentUserProfile) return;
+
+    // Get the requester's ID
+    const { data: friendship } = await supabase
+      .from('friendships')
+      .select('requester_id')
+      .eq('id', friendshipId)
+      .single();
 
     const { error } = await supabase
       .from('friendships')
       .update({ status: accept ? 'accepted' : 'rejected' })
       .eq('id', friendshipId);
 
-    if (!error) {
+    if (!error && friendship) {
+      // Create notification for the requester
+      await supabase.rpc('create_notification', {
+        p_user_id: friendship.requester_id,
+        p_type: accept ? 'friend_accepted' : 'friend_rejected',
+        p_content: accept 
+          ? `${currentUserProfile.full_name || currentUserProfile.username} قبل طلب صداقتك` 
+          : `${currentUserProfile.full_name || currentUserProfile.username} رفض طلب صداقتك`,
+        p_reference_id: friendshipId,
+      });
+
       toast({ title: accept ? 'تم قبول الطلب' : 'تم رفض الطلب' });
       checkFriendship();
+    }
+  };
+
+  const handleMessage = () => {
+    if (profile) {
+      selectChat(profile);
+      toggleChat();
     }
   };
 
@@ -158,9 +189,9 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-background">
       <Header 
         profile={currentUserProfile} 
-        notificationCount={0}
-        messageCount={0}
-        onMessagesClick={() => {}}
+        notificationCount={notificationCount}
+        messageCount={messageCount}
+        onMessagesClick={toggleChat}
       />
 
       <div className="max-w-4xl mx-auto" dir="rtl">
@@ -236,7 +267,7 @@ export default function ProfilePage() {
                     </div>
                   )}
                   {friendshipStatus === 'accepted' && (
-                    <Button variant="secondary">
+                    <Button variant="secondary" onClick={handleMessage}>
                       <MessageCircle className="h-4 w-4 ml-2" />
                       مراسلة
                     </Button>

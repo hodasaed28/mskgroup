@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Profile } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/layout/Header';
+import { useChatContext } from '@/contexts/ChatContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -17,7 +18,7 @@ export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
 
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { profile, notificationCount, messageCount, toggleChat } = useChatContext();
   const [results, setResults] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState(searchParams.get('q') || '');
@@ -29,32 +30,12 @@ export default function SearchPage() {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (user) {
-      fetchProfile();
-    }
-  }, [user]);
-
-  useEffect(() => {
     const q = searchParams.get('q');
     if (q) {
       setQuery(q);
       searchUsers(q);
     }
   }, [searchParams]);
-
-  const fetchProfile = async () => {
-    if (!user) return;
-    
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    
-    if (data) {
-      setProfile(data as Profile);
-    }
-  };
 
   const searchUsers = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
@@ -93,18 +74,28 @@ export default function SearchPage() {
   };
 
   const sendFriendRequest = async (userId: string) => {
-    if (!user) return;
+    if (!user || !profile) return;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('friendships')
       .insert({
         requester_id: user.id,
         addressee_id: userId,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      // Create notification for the addressee
+      await supabase.rpc('create_notification', {
+        p_user_id: userId,
+        p_type: 'friend_request',
+        p_content: `${profile.full_name || profile.username} أرسل لك طلب صداقة`,
+        p_reference_id: data.id,
       });
 
-    if (!error) {
       toast({ title: 'تم إرسال طلب الصداقة' });
-    } else if (error.code === '23505') {
+    } else if (error?.code === '23505') {
       toast({ title: 'طلب الصداقة موجود بالفعل', variant: 'destructive' });
     }
   };
@@ -121,9 +112,9 @@ export default function SearchPage() {
     <div className="min-h-screen bg-background">
       <Header 
         profile={profile} 
-        notificationCount={0}
-        messageCount={0}
-        onMessagesClick={() => {}}
+        notificationCount={notificationCount}
+        messageCount={messageCount}
+        onMessagesClick={toggleChat}
       />
 
       <div className="container mx-auto px-4 py-6 max-w-2xl" dir="rtl">

@@ -84,13 +84,23 @@ export default function FriendsSidebar({ currentUser }: FriendsSidebarProps) {
     }
   };
 
-  const handleFriendRequest = async (friendshipId: string, accept: boolean) => {
+  const handleFriendRequest = async (friendshipId: string, accept: boolean, requesterId: string) => {
     const { error } = await supabase
       .from('friendships')
       .update({ status: accept ? 'accepted' : 'rejected' })
       .eq('id', friendshipId);
 
     if (!error) {
+      // Create notification for the requester about the response
+      await supabase.rpc('create_notification', {
+        p_user_id: requesterId,
+        p_type: accept ? 'friend_accepted' : 'friend_rejected',
+        p_content: accept 
+          ? `${currentUser?.full_name || currentUser?.username} قبل طلب صداقتك` 
+          : `${currentUser?.full_name || currentUser?.username} رفض طلب صداقتك`,
+        p_reference_id: friendshipId,
+      });
+
       toast({
         title: accept ? 'تم قبول الطلب' : 'تم رفض الطلب',
       });
@@ -99,17 +109,27 @@ export default function FriendsSidebar({ currentUser }: FriendsSidebarProps) {
     }
   };
 
-  const sendFriendRequest = async (userId: string) => {
+  const sendFriendRequest = async (userId: string, userProfile: Profile) => {
     if (!currentUser) return;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('friendships')
       .insert({
         requester_id: currentUser.id,
         addressee_id: userId,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      // Create notification for the addressee about the friend request
+      await supabase.rpc('create_notification', {
+        p_user_id: userId,
+        p_type: 'friend_request',
+        p_content: `${currentUser.full_name || currentUser.username} أرسل لك طلب صداقة`,
+        p_reference_id: data.id,
       });
 
-    if (!error) {
       toast({
         title: 'تم إرسال طلب الصداقة',
       });
@@ -148,7 +168,7 @@ export default function FriendsSidebar({ currentUser }: FriendsSidebarProps) {
                   <Button 
                     size="icon" 
                     className="h-8 w-8"
-                    onClick={() => handleFriendRequest(request.id, true)}
+                    onClick={() => handleFriendRequest(request.id, true, request.requester_id)}
                   >
                     <Check className="h-4 w-4" />
                   </Button>
@@ -156,7 +176,7 @@ export default function FriendsSidebar({ currentUser }: FriendsSidebarProps) {
                     size="icon" 
                     variant="outline"
                     className="h-8 w-8"
-                    onClick={() => handleFriendRequest(request.id, false)}
+                    onClick={() => handleFriendRequest(request.id, false, request.requester_id)}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -195,7 +215,7 @@ export default function FriendsSidebar({ currentUser }: FriendsSidebarProps) {
                 <Button 
                   size="sm" 
                   variant="secondary"
-                  onClick={() => sendFriendRequest(person.id)}
+                  onClick={() => sendFriendRequest(person.id, person)}
                 >
                   <UserPlus className="h-4 w-4 ml-1" />
                   إضافة
@@ -231,7 +251,7 @@ export default function FriendsSidebar({ currentUser }: FriendsSidebarProps) {
                         {friend.username.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="absolute bottom-0 left-0 w-2.5 h-2.5 bg-online border-2 border-card rounded-full" />
+                    <span className="absolute bottom-0 left-0 w-2.5 h-2.5 bg-green-500 border-2 border-card rounded-full" />
                   </div>
                   <span className="text-sm font-medium">
                     {friend.full_name || friend.username}

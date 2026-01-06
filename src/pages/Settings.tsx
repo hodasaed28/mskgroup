@@ -4,9 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Profile } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/layout/Header';
-import { useChat } from '@/hooks/useChat';
-import ChatSidebar from '@/components/chat/ChatSidebar';
-import ChatWindow from '@/components/chat/ChatWindow';
+import { useChatContext } from '@/contexts/ChatContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Camera, Shield, Lock, User, Bell, Trash2 } from 'lucide-react';
+import { Loader2, Camera, Shield, Lock, User, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,12 +32,12 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const { profile: contextProfile, notificationCount, messageCount, toggleChat } = useChatContext();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [notificationCount, setNotificationCount] = useState(0);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -55,8 +53,6 @@ export default function SettingsPage() {
     confirmPassword: '',
   });
 
-  const { chatOpen, selectedChat, messageCount, toggleChat, closeChat, selectChat, closeSelectedChat } = useChat(user?.id);
-
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
@@ -66,7 +62,6 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       fetchProfile();
-      fetchNotificationCount();
     }
   }, [user]);
 
@@ -90,16 +85,6 @@ export default function SettingsPage() {
       });
     }
     setLoading(false);
-  };
-
-  const fetchNotificationCount = async () => {
-    if (!user) return;
-    const { count } = await supabase
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('is_read', false);
-    setNotificationCount(count || 0);
   };
 
   const handleSave = async () => {
@@ -248,7 +233,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header
-        profile={profile}
+        profile={contextProfile}
         notificationCount={notificationCount}
         messageCount={messageCount}
         onMessagesClick={toggleChat}
@@ -470,22 +455,6 @@ export default function SettingsPage() {
           </Card>
         </div>
       </div>
-
-      <ChatSidebar
-        isOpen={chatOpen}
-        onClose={closeChat}
-        currentUser={profile}
-        onSelectChat={selectChat}
-        selectedChat={selectedChat}
-      />
-
-      {selectedChat && profile && (
-        <ChatWindow
-          friend={selectedChat}
-          currentUser={profile}
-          onClose={closeSelectedChat}
-        />
-      )}
     </div>
   );
 }
