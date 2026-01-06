@@ -62,11 +62,21 @@ export default function SearchPage() {
       return;
     }
 
+    // Sanitize input by escaping special SQL characters
+    const sanitizedQuery = searchQuery
+      .replace(/[%_\\'"]/g, '')
+      .trim();
+    
+    if (!sanitizedQuery) {
+      setResults([]);
+      return;
+    }
+
     setLoading(true);
     const { data } = await supabase
       .from('profiles')
       .select('*')
-      .or(`username.ilike.%${searchQuery}%,full_name.ilike.%${searchQuery}%`)
+      .or('username.ilike.%' + sanitizedQuery + '%,full_name.ilike.%' + sanitizedQuery + '%')
       .limit(20);
 
     if (data) {

@@ -216,6 +216,8 @@ export type Database = {
           image_url: string | null
           updated_at: string | null
           user_id: string
+          video_url: string | null
+          visibility: string
         }
         Insert: {
           content?: string | null
@@ -224,6 +226,8 @@ export type Database = {
           image_url?: string | null
           updated_at?: string | null
           user_id: string
+          video_url?: string | null
+          visibility?: string
         }
         Update: {
           content?: string | null
@@ -232,6 +236,8 @@ export type Database = {
           image_url?: string | null
           updated_at?: string | null
           user_id?: string
+          video_url?: string | null
+          visibility?: string
         }
         Relationships: [
           {
@@ -250,6 +256,7 @@ export type Database = {
           created_at: string | null
           full_name: string | null
           id: string
+          is_private: boolean
           updated_at: string | null
           username: string
         }
@@ -259,6 +266,7 @@ export type Database = {
           created_at?: string | null
           full_name?: string | null
           id: string
+          is_private?: boolean
           updated_at?: string | null
           username: string
         }
@@ -268,17 +276,97 @@ export type Database = {
           created_at?: string | null
           full_name?: string | null
           id?: string
+          is_private?: boolean
           updated_at?: string | null
           username?: string
         }
         Relationships: []
+      }
+      reels: {
+        Row: {
+          caption: string | null
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+          video_url: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+          video_url: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reels_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reels_likes: {
+        Row: {
+          created_at: string | null
+          id: string
+          reel_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          reel_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          reel_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reels_likes_reel_id_fkey"
+            columns: ["reel_id"]
+            isOneToOne: false
+            referencedRelation: "reels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reels_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_notification: {
+        Args: {
+          p_content: string
+          p_reference_id?: string
+          p_type: string
+          p_user_id: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

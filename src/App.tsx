@@ -11,6 +11,7 @@ import Friends from "./pages/Friends";
 import Notifications from "./pages/Notifications";
 import Search from "./pages/Search";
 import Settings from "./pages/Settings";
+import Reels from "./pages/Reels";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/search" element={<Search />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/reels" element={<Reels />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
