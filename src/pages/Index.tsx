@@ -38,6 +38,18 @@ export default function Index() {
 
   const fetchNotificationCount = async () => {
     if (!user) return;
+
+    const { count } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false);
+
+    setNotificationCount(count || 0);
+  };
+
+  const fetchNotificationCount2 = async () => {
+    if (!user) return;
     const { count } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
