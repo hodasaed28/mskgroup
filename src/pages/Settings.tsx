@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
 import { Profile } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/layout/Header';
@@ -14,7 +16,8 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Camera, Shield, Lock, User, Trash2 } from 'lucide-react';
+import { Loader2, Camera, Shield, Lock, User, Trash2, Globe, Moon, Sun, Smartphone } from 'lucide-react';
+import { LanguageSelector } from '@/components/LanguageSelector';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,11 +29,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function SettingsPage() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
+  const { isRTL, languages, currentLanguage, changeLanguage } = useLanguage();
 
   const { profile: contextProfile, notificationCount, messageCount, toggleChat } = useChatContext();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -38,6 +50,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -64,6 +78,30 @@ export default function SettingsPage() {
       fetchProfile();
     }
   }, [user]);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      applyTheme(savedTheme);
+    }
+  }, []);
+
+  const applyTheme = (newTheme: 'light' | 'dark' | 'system') => {
+    const root = document.documentElement;
+    if (newTheme === 'system') {
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      root.classList.toggle('dark', systemDark);
+    } else {
+      root.classList.toggle('dark', newTheme === 'dark');
+    }
+    localStorage.setItem('theme', newTheme);
+  };
+
+  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
+    setTheme(newTheme);
+    applyTheme(newTheme);
+  };
 
   const fetchProfile = async () => {
     if (!user) return;
@@ -105,12 +143,12 @@ export default function SettingsPage() {
 
     if (error) {
       toast({
-        title: 'خطأ',
-        description: error.code === '23505' ? 'اسم المستخدم مستخدم بالفعل' : 'فشل في حفظ التغييرات',
+        title: t('common.error'),
+        description: error.code === '23505' ? t('auth.emailExists') : t('common.error'),
         variant: 'destructive',
       });
     } else {
-      toast({ title: 'تم حفظ التغييرات بنجاح' });
+      toast({ title: t('settings.saved') });
       fetchProfile();
     }
   };
@@ -121,8 +159,8 @@ export default function SettingsPage() {
 
     if (file.size > 5 * 1024 * 1024) {
       toast({
-        title: 'خطأ',
-        description: 'حجم الصورة يجب أن يكون أقل من 5 ميجابايت',
+        title: t('common.error'),
+        description: t('common.error'),
         variant: 'destructive',
       });
       return;
@@ -151,12 +189,12 @@ export default function SettingsPage() {
 
       if (updateError) throw updateError;
 
-      toast({ title: 'تم تحديث الصورة الشخصية' });
+      toast({ title: t('settings.saved') });
       fetchProfile();
     } catch (error: any) {
       toast({
-        title: 'خطأ',
-        description: error.message || 'فشل في رفع الصورة',
+        title: t('common.error'),
+        description: error.message || t('common.error'),
         variant: 'destructive',
       });
     } finally {
@@ -165,10 +203,20 @@ export default function SettingsPage() {
   };
 
   const handlePasswordChange = async () => {
+    // Validate current password first
+    if (!passwordForm.currentPassword) {
+      toast({
+        title: t('common.error'),
+        description: t('settings.currentPassword'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast({
-        title: 'خطأ',
-        description: 'كلمات المرور غير متطابقة',
+        title: t('common.error'),
+        description: t('settings.passwordMismatch'),
         variant: 'destructive',
       });
       return;
@@ -176,14 +224,29 @@ export default function SettingsPage() {
 
     if (passwordForm.newPassword.length < 6) {
       toast({
-        title: 'خطأ',
-        description: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
+        title: t('common.error'),
+        description: t('settings.passwordTooShort'),
         variant: 'destructive',
       });
       return;
     }
 
     setChangingPassword(true);
+
+    // First, verify current password by attempting to sign in
+    const { error: verifyError } = await signIn(user?.email || '', passwordForm.currentPassword);
+    
+    if (verifyError) {
+      setChangingPassword(false);
+      toast({
+        title: t('common.error'),
+        description: t('settings.wrongPassword'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Now update the password
     const { error } = await supabase.auth.updateUser({
       password: passwordForm.newPassword,
     });
@@ -192,12 +255,12 @@ export default function SettingsPage() {
 
     if (error) {
       toast({
-        title: 'خطأ',
+        title: t('common.error'),
         description: error.message,
         variant: 'destructive',
       });
     } else {
-      toast({ title: 'تم تغيير كلمة المرور بنجاح' });
+      toast({ title: t('settings.passwordChanged') });
       setPasswordForm({
         currentPassword: '',
         newPassword: '',
@@ -212,14 +275,22 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
-    // Note: Full account deletion requires backend function
-    // For now, we'll sign out the user
     toast({
-      title: 'تنبيه',
-      description: 'لحذف الحساب بشكل كامل، يرجى التواصل مع الدعم الفني',
+      title: t('common.error'),
+      description: t('settings.deleteAccountWarning'),
     });
     await signOut();
     navigate('/auth');
+  };
+
+  const handle2FAToggle = (enabled: boolean) => {
+    setTwoFactorEnabled(enabled);
+    toast({
+      title: enabled ? t('settings.enable2FA') : t('settings.disable2FA'),
+      description: enabled 
+        ? t('settings.twoFactorDesc')
+        : t('settings.twoFactorDesc'),
+    });
   };
 
   if (authLoading || loading) {
@@ -239,8 +310,8 @@ export default function SettingsPage() {
         onMessagesClick={toggleChat}
       />
 
-      <div className="container mx-auto px-4 py-6 max-w-2xl" dir="rtl">
-        <h1 className="text-2xl font-bold mb-6">الإعدادات</h1>
+      <div className="container mx-auto px-4 py-6 max-w-2xl" dir={isRTL ? 'rtl' : 'ltr'}>
+        <h1 className="text-2xl font-bold mb-6">{t('settings.title')}</h1>
 
         <div className="space-y-6">
           {/* Profile Picture */}
@@ -248,7 +319,7 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
-                الصورة الشخصية
+                {t('settings.profilePicture')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -292,11 +363,11 @@ export default function SettingsPage() {
           {/* Profile Info */}
           <Card>
             <CardHeader>
-              <CardTitle>الملف الشخصي</CardTitle>
+              <CardTitle>{t('settings.profileInfo')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">اسم المستخدم</Label>
+                <Label htmlFor="username">{t('auth.username')}</Label>
                 <Input
                   id="username"
                   value={form.username}
@@ -304,7 +375,7 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="full_name">الاسم الكامل</Label>
+                <Label htmlFor="full_name">{t('auth.fullName')}</Label>
                 <Input
                   id="full_name"
                   value={form.full_name}
@@ -312,25 +383,88 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="bio">نبذة عنك</Label>
+                <Label htmlFor="bio">{t('common.bio')}</Label>
                 <Textarea
                   id="bio"
                   value={form.bio}
                   onChange={(e) => setForm({ ...form, bio: e.target.value })}
-                  placeholder="اكتب نبذة قصيرة عنك..."
+                  placeholder={t('common.bioPlaceholder')}
                   rows={3}
                 />
               </div>
               <Button onClick={handleSave} disabled={saving}>
                 {saving ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                    جارٍ الحفظ...
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    {t('settings.saving')}
                   </>
                 ) : (
-                  'حفظ التغييرات'
+                  t('settings.saveChanges')
                 )}
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* Language Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                {t('settings.language')}
+              </CardTitle>
+              <CardDescription>{t('settings.languageDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Select value={currentLanguage.code} onValueChange={(val) => changeLanguage(val as any)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {languages.map((lang) => (
+                    <SelectItem key={lang.code} value={lang.code}>
+                      {lang.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+
+          {/* Theme Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {theme === 'dark' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                {t('settings.theme')}
+              </CardTitle>
+              <CardDescription>{t('settings.themeDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2">
+                <Button
+                  variant={theme === 'light' ? 'default' : 'outline'}
+                  onClick={() => handleThemeChange('light')}
+                  className="flex-1"
+                >
+                  <Sun className="h-4 w-4 mr-2" />
+                  {t('settings.lightMode')}
+                </Button>
+                <Button
+                  variant={theme === 'dark' ? 'default' : 'outline'}
+                  onClick={() => handleThemeChange('dark')}
+                  className="flex-1"
+                >
+                  <Moon className="h-4 w-4 mr-2" />
+                  {t('settings.darkMode')}
+                </Button>
+                <Button
+                  variant={theme === 'system' ? 'default' : 'outline'}
+                  onClick={() => handleThemeChange('system')}
+                  className="flex-1"
+                >
+                  {t('settings.systemTheme')}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -339,18 +473,16 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5" />
-                الخصوصية
+                {t('settings.privacy')}
               </CardTitle>
-              <CardDescription>
-                تحكم في من يمكنه رؤية ملفك الشخصي ومنشوراتك
-              </CardDescription>
+              <CardDescription>{t('settings.privacyDesc')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>حساب خاص</Label>
+                  <Label>{t('settings.privateAccount')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    فقط الأصدقاء يمكنهم رؤية منشوراتك
+                    {t('settings.privateAccountDesc')}
                   </p>
                 </div>
                 <Switch
@@ -360,8 +492,33 @@ export default function SettingsPage() {
               </div>
               <Separator />
               <Button onClick={handleSave} disabled={saving} variant="outline">
-                حفظ إعدادات الخصوصية
+                {t('settings.saveChanges')}
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* 2FA Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Smartphone className="h-5 w-5" />
+                {t('settings.twoFactorAuth')}
+              </CardTitle>
+              <CardDescription>{t('settings.twoFactorDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>{twoFactorEnabled ? t('settings.disable2FA') : t('settings.enable2FA')}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings.twoFactorDesc')}
+                  </p>
+                </div>
+                <Switch
+                  checked={twoFactorEnabled}
+                  onCheckedChange={handle2FAToggle}
+                />
+              </div>
             </CardContent>
           </Card>
 
@@ -370,12 +527,21 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Lock className="h-5 w-5" />
-                تغيير كلمة المرور
+                {t('settings.changePassword')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="newPassword">كلمة المرور الجديدة</Label>
+                <Label htmlFor="currentPassword">{t('settings.currentPassword')}</Label>
+                <Input
+                  id="currentPassword"
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">{t('settings.newPassword')}</Label>
                 <Input
                   id="newPassword"
                   type="password"
@@ -384,7 +550,7 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">تأكيد كلمة المرور</Label>
+                <Label htmlFor="confirmPassword">{t('settings.confirmNewPassword')}</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -394,15 +560,15 @@ export default function SettingsPage() {
               </div>
               <Button
                 onClick={handlePasswordChange}
-                disabled={changingPassword || !passwordForm.newPassword}
+                disabled={changingPassword || !passwordForm.currentPassword || !passwordForm.newPassword}
               >
                 {changingPassword ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                    جارٍ التغيير...
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    {t('settings.changingPassword')}
                   </>
                 ) : (
-                  'تغيير كلمة المرور'
+                  t('settings.changePasswordBtn')
                 )}
               </Button>
             </CardContent>
@@ -411,40 +577,40 @@ export default function SettingsPage() {
           {/* Account */}
           <Card>
             <CardHeader>
-              <CardTitle>الحساب</CardTitle>
+              <CardTitle>{t('settings.account')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">البريد الإلكتروني</p>
+                  <p className="text-sm text-muted-foreground mb-1">{t('auth.email')}</p>
                   <p className="font-medium">{user?.email}</p>
                 </div>
                 <Separator />
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Button variant="outline" onClick={handleSignOut}>
-                    تسجيل الخروج
+                    {t('nav.logout')}
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive">
-                        <Trash2 className="h-4 w-4 ml-2" />
-                        حذف الحساب
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {t('settings.deleteAccount')}
                       </Button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent dir="rtl">
+                    <AlertDialogContent dir={isRTL ? 'rtl' : 'ltr'}>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                        <AlertDialogTitle>{t('common.areYouSure')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                          هذا الإجراء لا يمكن التراجع عنه. سيتم حذف حسابك وجميع بياناتك بشكل نهائي.
+                          {t('settings.deleteAccountWarning')}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
-                      <AlertDialogFooter className="flex-row-reverse gap-2">
-                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                      <AlertDialogFooter className={isRTL ? 'flex-row-reverse gap-2' : 'gap-2'}>
+                        <AlertDialogCancel>{t('settings.cancel')}</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={handleDeleteAccount}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          حذف الحساب
+                          {t('settings.deleteAccount')}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
