@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -13,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Home, Users, MessageCircle, Bell, Search, LogOut, User, Settings, Film } from 'lucide-react';
 import { Profile } from '@/types/database';
+import { LanguageSelector } from '@/components/LanguageSelector';
 
 interface HeaderProps {
   profile: Profile | null;
@@ -24,6 +27,8 @@ interface HeaderProps {
 export default function Header({ profile, notificationCount, messageCount, onMessagesClick }: HeaderProps) {
   const { signOut } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSignOut = async () => {
@@ -39,20 +44,20 @@ export default function Header({ profile, notificationCount, messageCount, onMes
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-card shadow-sm border-b" dir="rtl">
+    <header className="sticky top-0 z-50 bg-card shadow-sm border-b" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="container mx-auto px-4 h-14 flex items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-2">
           <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-xl">ت</span>
+            <span className="text-primary-foreground font-bold text-lg">MSK</span>
           </div>
         </Link>
 
         <form onSubmit={handleSearch} className="flex-1 max-w-md hidden md:block">
           <div className="relative">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className={`absolute ${isRTL ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground`} />
             <Input
-              placeholder="ابحث عن أصدقاء..."
-              className="pr-10 bg-muted border-0"
+              placeholder={t('nav.search')}
+              className={`${isRTL ? 'pr-10' : 'pl-10'} bg-muted border-0`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -88,6 +93,8 @@ export default function Header({ profile, notificationCount, messageCount, onMes
             </Link>
           </Button>
 
+          <LanguageSelector />
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
@@ -99,20 +106,20 @@ export default function Header({ profile, notificationCount, messageCount, onMes
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuContent align={isRTL ? 'start' : 'end'} className="w-56">
               <DropdownMenuItem asChild>
                 <Link to={`/profile/${profile?.id}`} className="flex items-center gap-2">
-                  <User className="h-4 w-4" /><span>الملف الشخصي</span>
+                  <User className="h-4 w-4" /><span>{t('nav.profile')}</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link to="/settings" className="flex items-center gap-2">
-                  <Settings className="h-4 w-4" /><span>الإعدادات</span>
+                  <Settings className="h-4 w-4" /><span>{t('nav.settings')}</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
-                <LogOut className="h-4 w-4 ml-2" /><span>تسجيل الخروج</span>
+                <LogOut className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} /><span>{t('nav.logout')}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

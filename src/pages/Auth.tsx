@@ -1,35 +1,83 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Users, MessageCircle, Heart, Share2 } from 'lucide-react';
+import { Users, MessageCircle, Heart, Share2, Mail, Phone, Loader2 } from 'lucide-react';
 import { z } from 'zod';
+import { LanguageSelector } from '@/components/LanguageSelector';
+import { countries, Country } from '@/data/countries';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from '@/components/ui/input-otp';
 
-const loginSchema = z.object({
-  email: z.string().email('البريد الإلكتروني غير صالح'),
-  password: z.string().min(6, 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'),
-});
-
-const signUpSchema = z.object({
-  email: z.string().email('البريد الإلكتروني غير صالح'),
-  password: z.string().min(6, 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'),
-  username: z.string().min(3, 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل'),
-  fullName: z.string().min(2, 'الاسم الكامل مطلوب'),
-});
+type AuthMethod = 'email' | 'phone';
+type AuthStep = 'credentials' | 'otp';
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
 
-  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-  const [signUpForm, setSignUpForm] = useState({ email: '', password: '', username: '', fullName: '' });
+  const [authMethod, setAuthMethod] = useState<AuthMethod>('email');
+  const [authStep, setAuthStep] = useState<AuthStep>('credentials');
+  const [selectedCountry, setSelectedCountry] = useState<Country>(countries[0]);
+  const [otp, setOtp] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
+
+  const [loginForm, setLoginForm] = useState({ email: '', password: '', phone: '' });
+  const [signUpForm, setSignUpForm] = useState({ 
+    email: '', 
+    password: '', 
+    confirmPassword: '',
+    username: '', 
+    fullName: '',
+    phone: ''
+  });
+
+  const loginSchema = z.object({
+    email: authMethod === 'email' 
+      ? z.string().email(t('auth.invalidCredentials'))
+      : z.string().optional(),
+    password: z.string().min(6, t('settings.passwordTooShort')),
+    phone: authMethod === 'phone'
+      ? z.string().min(8, t('auth.invalidCredentials'))
+      : z.string().optional(),
+  });
+
+  const signUpSchema = z.object({
+    email: authMethod === 'email' 
+      ? z.string().email(t('auth.invalidCredentials'))
+      : z.string().optional(),
+    password: z.string().min(6, t('settings.passwordTooShort')),
+    confirmPassword: z.string().min(6, t('settings.passwordTooShort')),
+    username: z.string().min(3, t('auth.dataError')),
+    fullName: z.string().min(2, t('auth.dataError')),
+    phone: authMethod === 'phone'
+      ? z.string().min(8, t('auth.invalidCredentials'))
+      : z.string().optional(),
+  }).refine(data => data.password === data.confirmPassword, {
+    message: t('settings.passwordMismatch'),
+    path: ['confirmPassword'],
+  });
 
   useEffect(() => {
     if (user) {
@@ -37,15 +85,33 @@ export default function Auth() {
     }
   }, [user, navigate]);
 
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendTimer]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const result = loginSchema.safeParse(loginForm);
     if (!result.success) {
       toast({
-        title: 'خطأ في البيانات',
+        title: t('auth.dataError'),
         description: result.error.errors[0].message,
         variant: 'destructive',
+      });
+      return;
+    }
+
+    if (authMethod === 'phone') {
+      // For phone auth, we would trigger OTP here
+      setAuthStep('otp');
+      setResendTimer(60);
+      toast({
+        title: t('auth.verifyOtp'),
+        description: `${t('auth.enterOtp')} ${selectedCountry.dialCode}${loginForm.phone}`,
       });
       return;
     }
@@ -55,19 +121,15 @@ export default function Auth() {
     setIsLoading(false);
 
     if (error) {
-      let message = 'حدث خطأ أثناء تسجيل الدخول';
-      if (error.message.includes('Invalid login credentials')) {
-        message = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
-      }
       toast({
-        title: 'خطأ',
-        description: message,
+        title: t('auth.error'),
+        description: t('auth.invalidCredentials'),
         variant: 'destructive',
       });
     } else {
       toast({
-        title: 'مرحباً!',
-        description: 'تم تسجيل الدخول بنجاح',
+        title: t('auth.welcomeBack'),
+        description: t('auth.loginSuccess'),
       });
     }
   };
@@ -78,9 +140,19 @@ export default function Auth() {
     const result = signUpSchema.safeParse(signUpForm);
     if (!result.success) {
       toast({
-        title: 'خطأ في البيانات',
+        title: t('auth.dataError'),
         description: result.error.errors[0].message,
         variant: 'destructive',
+      });
+      return;
+    }
+
+    if (authMethod === 'phone') {
+      setAuthStep('otp');
+      setResendTimer(60);
+      toast({
+        title: t('auth.verifyOtp'),
+        description: `${t('auth.enterOtp')} ${selectedCountry.dialCode}${signUpForm.phone}`,
       });
       return;
     }
@@ -95,59 +167,170 @@ export default function Auth() {
     setIsLoading(false);
 
     if (error) {
-      let message = 'حدث خطأ أثناء إنشاء الحساب';
+      let message = t('auth.error');
       if (error.message.includes('already registered')) {
-        message = 'هذا البريد الإلكتروني مسجل بالفعل';
+        message = t('auth.emailExists');
       }
       toast({
-        title: 'خطأ',
+        title: t('auth.error'),
         description: message,
         variant: 'destructive',
       });
     } else {
       toast({
-        title: 'تم إنشاء الحساب!',
-        description: 'مرحباً بك في شبكتنا الاجتماعية',
+        title: t('auth.accountCreated'),
+        description: t('auth.welcomeBack'),
       });
     }
   };
 
+  const handleVerifyOtp = async () => {
+    if (otp.length !== 6) return;
+    
+    setIsLoading(true);
+    // Here you would verify the OTP with Supabase
+    // For now, we'll simulate success
+    setTimeout(() => {
+      setIsLoading(false);
+      toast({
+        title: t('auth.loginSuccess'),
+      });
+      // In real implementation, complete the phone auth flow here
+    }, 1500);
+  };
+
+  const handleResendOtp = () => {
+    setResendTimer(60);
+    toast({
+      title: t('auth.resendOtp'),
+      description: `${t('auth.enterOtp')} ${selectedCountry.dialCode}${authMethod === 'email' ? signUpForm.phone : loginForm.phone}`,
+    });
+  };
+
+  const renderOtpStep = () => (
+    <div className="space-y-6">
+      <div className="text-center">
+        <p className="text-muted-foreground mb-4">
+          {t('auth.enterOtp')}
+          <br />
+          <strong>{selectedCountry.dialCode}{authMethod === 'phone' ? loginForm.phone : signUpForm.phone}</strong>
+        </p>
+      </div>
+      <div className="flex justify-center" dir="ltr">
+        <InputOTP value={otp} onChange={setOtp} maxLength={6}>
+          <InputOTPGroup>
+            <InputOTPSlot index={0} />
+            <InputOTPSlot index={1} />
+            <InputOTPSlot index={2} />
+            <InputOTPSlot index={3} />
+            <InputOTPSlot index={4} />
+            <InputOTPSlot index={5} />
+          </InputOTPGroup>
+        </InputOTP>
+      </div>
+      <Button 
+        onClick={handleVerifyOtp} 
+        className="w-full" 
+        disabled={isLoading || otp.length !== 6}
+      >
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('auth.verifyOtp')}
+      </Button>
+      <div className="text-center">
+        {resendTimer > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {t('auth.resendIn')} {resendTimer}s
+          </p>
+        ) : (
+          <Button variant="link" onClick={handleResendOtp}>
+            {t('auth.resendOtp')}
+          </Button>
+        )}
+      </div>
+      <Button 
+        variant="ghost" 
+        className="w-full" 
+        onClick={() => {
+          setAuthStep('credentials');
+          setOtp('');
+        }}
+      >
+        ←
+      </Button>
+    </div>
+  );
+
+  const renderPhoneInput = (value: string, onChange: (val: string) => void) => (
+    <div className="flex gap-2" dir="ltr">
+      <Select
+        value={selectedCountry.code}
+        onValueChange={(code) => {
+          const country = countries.find(c => c.code === code);
+          if (country) setSelectedCountry(country);
+        }}
+      >
+        <SelectTrigger className="w-[140px]">
+          <SelectValue>
+            {selectedCountry.flag} {selectedCountry.dialCode}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent className="max-h-60">
+          {countries.map((country) => (
+            <SelectItem key={country.code} value={country.code}>
+              {country.flag} {country.name} ({country.dialCode})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Input
+        type="tel"
+        placeholder="5xxxxxxxx"
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
+        className="flex-1"
+      />
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-primary/5 flex items-center justify-center p-4" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-primary/5 flex items-center justify-center p-4" dir={isRTL ? 'rtl' : 'ltr'}>
+      <div className="absolute top-4 right-4">
+        <LanguageSelector />
+      </div>
+      
       <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-8 items-center">
         {/* Hero Section */}
-        <div className="hidden lg:flex flex-col gap-6 text-center lg:text-right">
-          <h1 className="text-5xl font-bold text-primary">تواصل</h1>
+        <div className="hidden lg:flex flex-col gap-6 text-center lg:text-start">
+          <h1 className="text-5xl font-bold text-primary">MSK</h1>
           <p className="text-xl text-muted-foreground">
-            تواصل مع أصدقائك وعائلتك من جميع أنحاء العالم
+            {t('app.description')}
           </p>
           <div className="grid grid-cols-2 gap-4 mt-8">
             <div className="flex items-center gap-3 p-4 bg-card rounded-lg shadow-sm">
               <Users className="h-8 w-8 text-primary" />
-              <div className="text-right">
-                <p className="font-semibold">أصدقاء جدد</p>
-                <p className="text-sm text-muted-foreground">تعرف على أشخاص جدد</p>
+              <div className={isRTL ? 'text-right' : 'text-left'}>
+                <p className="font-semibold">{t('features.newFriends')}</p>
+                <p className="text-sm text-muted-foreground">{t('features.newFriendsDesc')}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-4 bg-card rounded-lg shadow-sm">
               <MessageCircle className="h-8 w-8 text-primary" />
-              <div className="text-right">
-                <p className="font-semibold">دردشة فورية</p>
-                <p className="text-sm text-muted-foreground">تحدث في الوقت الحقيقي</p>
+              <div className={isRTL ? 'text-right' : 'text-left'}>
+                <p className="font-semibold">{t('features.instantChat')}</p>
+                <p className="text-sm text-muted-foreground">{t('features.instantChatDesc')}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-4 bg-card rounded-lg shadow-sm">
               <Heart className="h-8 w-8 text-primary" />
-              <div className="text-right">
-                <p className="font-semibold">إعجابات</p>
-                <p className="text-sm text-muted-foreground">أظهر دعمك للآخرين</p>
+              <div className={isRTL ? 'text-right' : 'text-left'}>
+                <p className="font-semibold">{t('features.likes')}</p>
+                <p className="text-sm text-muted-foreground">{t('features.likesDesc')}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-4 bg-card rounded-lg shadow-sm">
               <Share2 className="h-8 w-8 text-primary" />
-              <div className="text-right">
-                <p className="font-semibold">مشاركة</p>
-                <p className="text-sm text-muted-foreground">شارك لحظاتك</p>
+              <div className={isRTL ? 'text-right' : 'text-left'}>
+                <p className="font-semibold">{t('features.share')}</p>
+                <p className="text-sm text-muted-foreground">{t('features.shareDesc')}</p>
               </div>
             </div>
           </div>
@@ -156,100 +339,149 @@ export default function Auth() {
         {/* Auth Card */}
         <Card className="w-full max-w-md mx-auto shadow-xl border-0">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl lg:hidden text-primary">تواصل</CardTitle>
+            <CardTitle className="text-2xl lg:hidden text-primary">MSK</CardTitle>
             <CardDescription>
-              انضم إلى مجتمعنا اليوم
+              {t('auth.joinCommunity')}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="login">تسجيل الدخول</TabsTrigger>
-                <TabsTrigger value="signup">حساب جديد</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="login">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">البريد الإلكتروني</Label>
-                    <Input
-                      id="login-email"
-                      type="email"
-                      placeholder="example@email.com"
-                      value={loginForm.email}
-                      onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">كلمة المرور</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={loginForm.password}
-                      onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'جارٍ تسجيل الدخول...' : 'تسجيل الدخول'}
+            {authStep === 'otp' ? renderOtpStep() : (
+              <>
+                {/* Auth Method Toggle */}
+                <div className="flex gap-2 mb-6">
+                  <Button
+                    variant={authMethod === 'email' ? 'default' : 'outline'}
+                    className="flex-1"
+                    onClick={() => setAuthMethod('email')}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    {t('auth.emailAuth')}
                   </Button>
-                </form>
-              </TabsContent>
-              
-              <TabsContent value="signup">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-fullname">الاسم الكامل</Label>
-                    <Input
-                      id="signup-fullname"
-                      type="text"
-                      placeholder="محمد أحمد"
-                      value={signUpForm.fullName}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, fullName: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-username">اسم المستخدم</Label>
-                    <Input
-                      id="signup-username"
-                      type="text"
-                      placeholder="mohammed123"
-                      value={signUpForm.username}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, username: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">البريد الإلكتروني</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="example@email.com"
-                      value={signUpForm.email}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">كلمة المرور</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={signUpForm.password}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, password: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'جارٍ إنشاء الحساب...' : 'إنشاء حساب'}
+                  <Button
+                    variant={authMethod === 'phone' ? 'default' : 'outline'}
+                    className="flex-1"
+                    onClick={() => setAuthMethod('phone')}
+                  >
+                    <Phone className="h-4 w-4 mr-2" />
+                    {t('auth.phoneAuth')}
                   </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+                </div>
+
+                <Tabs defaultValue="login" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-6">
+                    <TabsTrigger value="login">{t('auth.login')}</TabsTrigger>
+                    <TabsTrigger value="signup">{t('auth.signup')}</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="login">
+                    <form onSubmit={handleLogin} className="space-y-4">
+                      {authMethod === 'email' ? (
+                        <div className="space-y-2">
+                          <Label htmlFor="login-email">{t('auth.email')}</Label>
+                          <Input
+                            id="login-email"
+                            type="email"
+                            placeholder="example@email.com"
+                            value={loginForm.email}
+                            onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                            required
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Label>{t('auth.phone')}</Label>
+                          {renderPhoneInput(loginForm.phone, (val) => setLoginForm({ ...loginForm, phone: val }))}
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="login-password">{t('auth.password')}</Label>
+                        <Input
+                          id="login-password"
+                          type="password"
+                          placeholder="••••••••"
+                          value={loginForm.password}
+                          onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <Button type="submit" className="w-full" disabled={isLoading}>
+                        {isLoading ? t('auth.loggingIn') : t('auth.loginButton')}
+                      </Button>
+                    </form>
+                  </TabsContent>
+                  
+                  <TabsContent value="signup">
+                    <form onSubmit={handleSignUp} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-fullname">{t('auth.fullName')}</Label>
+                        <Input
+                          id="signup-fullname"
+                          type="text"
+                          placeholder="John Doe"
+                          value={signUpForm.fullName}
+                          onChange={(e) => setSignUpForm({ ...signUpForm, fullName: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-username">{t('auth.username')}</Label>
+                        <Input
+                          id="signup-username"
+                          type="text"
+                          placeholder="johndoe123"
+                          value={signUpForm.username}
+                          onChange={(e) => setSignUpForm({ ...signUpForm, username: e.target.value })}
+                          required
+                        />
+                      </div>
+                      {authMethod === 'email' ? (
+                        <div className="space-y-2">
+                          <Label htmlFor="signup-email">{t('auth.email')}</Label>
+                          <Input
+                            id="signup-email"
+                            type="email"
+                            placeholder="example@email.com"
+                            value={signUpForm.email}
+                            onChange={(e) => setSignUpForm({ ...signUpForm, email: e.target.value })}
+                            required
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Label>{t('auth.phone')}</Label>
+                          {renderPhoneInput(signUpForm.phone, (val) => setSignUpForm({ ...signUpForm, phone: val }))}
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-password">{t('auth.password')}</Label>
+                        <Input
+                          id="signup-password"
+                          type="password"
+                          placeholder="••••••••"
+                          value={signUpForm.password}
+                          onChange={(e) => setSignUpForm({ ...signUpForm, password: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-confirm-password">{t('auth.confirmPassword')}</Label>
+                        <Input
+                          id="signup-confirm-password"
+                          type="password"
+                          placeholder="••••••••"
+                          value={signUpForm.confirmPassword}
+                          onChange={(e) => setSignUpForm({ ...signUpForm, confirmPassword: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <Button type="submit" className="w-full" disabled={isLoading}>
+                        {isLoading ? t('auth.creatingAccount') : t('auth.signupButton')}
+                      </Button>
+                    </form>
+                  </TabsContent>
+                </Tabs>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
