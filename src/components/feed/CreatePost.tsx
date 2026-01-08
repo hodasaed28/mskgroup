@@ -10,10 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Image, Video, Smile, Send, X, Globe, Users, Lock, Loader2 } from 'lucide-react';
+import { Image, Video, Send, X, Globe, Users, Lock, Loader2 } from 'lucide-react';
 import { Profile } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
+import { EmojiPicker } from '@/components/ui/emoji-picker';
 
 interface CreatePostProps {
   profile: Profile | null;
@@ -30,15 +33,35 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
+
+  const handleEmojiSelect = (emoji: string) => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newContent = content.slice(0, start) + emoji + content.slice(end);
+      setContent(newContent);
+      // Set cursor position after emoji
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+        textarea.focus();
+      }, 0);
+    } else {
+      setContent(content + emoji);
+    }
+  };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
         toast({
-          title: 'خطأ',
-          description: 'حجم الصورة يجب أن يكون أقل من 10 ميجابايت',
+          title: t('common.error'),
+          description: 'Image must be less than 10MB',
           variant: 'destructive',
         });
         return;
@@ -55,8 +78,8 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
     if (file) {
       if (file.size > 50 * 1024 * 1024) {
         toast({
-          title: 'خطأ',
-          description: 'حجم الفيديو يجب أن يكون أقل من 50 ميجابايت',
+          title: t('common.error'),
+          description: 'Video must be less than 50MB',
           variant: 'destructive',
         });
         return;
@@ -112,14 +135,14 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
       if (imageFile) {
         imageUrl = await uploadFile(imageFile, 'image');
         if (!imageUrl) {
-          throw new Error('فشل في رفع الصورة');
+          throw new Error('Failed to upload image');
         }
       }
 
       if (videoFile) {
         videoUrl = await uploadFile(videoFile, 'video');
         if (!videoUrl) {
-          throw new Error('فشل في رفع الفيديو');
+          throw new Error('Failed to upload video');
         }
       }
 
@@ -140,13 +163,13 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
       setVisibility('everyone');
       onPostCreated();
       toast({
-        title: 'تم النشر!',
-        description: 'تم نشر منشورك بنجاح',
+        title: t('common.success'),
+        description: 'Post published successfully',
       });
     } catch (error: any) {
       toast({
-        title: 'خطأ',
-        description: error.message || 'فشل في نشر المنشور',
+        title: t('common.error'),
+        description: error.message || 'Failed to publish post',
         variant: 'destructive',
       });
     } finally {
@@ -166,7 +189,7 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
   };
 
   return (
-    <Card className="shadow-sm" dir="rtl">
+    <Card className="shadow-sm" dir={isRTL ? 'rtl' : 'ltr'}>
       <CardContent className="p-4">
         <div className="flex gap-3">
           <Avatar className="h-10 w-10">
@@ -177,7 +200,8 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
           </Avatar>
           <div className="flex-1">
             <Textarea
-              placeholder={`ماذا يدور في ذهنك، ${profile?.full_name || profile?.username}؟`}
+              ref={textareaRef}
+              placeholder={`What's on your mind, ${profile?.full_name || profile?.username}?`}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="min-h-[80px] resize-none border-0 bg-muted focus-visible:ring-0 text-base"
@@ -189,7 +213,7 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
                 <Button
                   variant="secondary"
                   size="icon"
-                  className="absolute top-2 right-2 z-10 h-8 w-8 rounded-full"
+                  className={`absolute top-2 z-10 h-8 w-8 rounded-full ${isRTL ? 'right-2' : 'left-2'}`}
                   onClick={clearMedia}
                 >
                   <X className="h-4 w-4" />
@@ -212,7 +236,7 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
             )}
 
             <div className="flex items-center justify-between mt-3 pt-3 border-t">
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 <input
                   ref={imageInputRef}
                   type="file"
@@ -226,8 +250,7 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
                   className="text-muted-foreground"
                   onClick={() => imageInputRef.current?.click()}
                 >
-                  <Image className="h-5 w-5 ml-2" />
-                  <span className="hidden sm:inline">صورة</span>
+                  <Image className="h-5 w-5" />
                 </Button>
                 
                 <input
@@ -243,19 +266,15 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
                   className="text-muted-foreground"
                   onClick={() => videoInputRef.current?.click()}
                 >
-                  <Video className="h-5 w-5 ml-2" />
-                  <span className="hidden sm:inline">فيديو</span>
+                  <Video className="h-5 w-5" />
                 </Button>
                 
-                <Button variant="ghost" size="sm" className="text-muted-foreground">
-                  <Smile className="h-5 w-5 ml-2" />
-                  <span className="hidden sm:inline">مشاعر</span>
-                </Button>
+                <EmojiPicker onEmojiSelect={handleEmojiSelect} />
               </div>
 
               <div className="flex items-center gap-2">
                 <Select value={visibility} onValueChange={(v: any) => setVisibility(v)}>
-                  <SelectTrigger className="w-[130px] h-9">
+                  <SelectTrigger className="w-[110px] h-9">
                     <div className="flex items-center gap-2">
                       {getVisibilityIcon()}
                       <SelectValue />
@@ -265,19 +284,19 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
                     <SelectItem value="everyone">
                       <div className="flex items-center gap-2">
                         <Globe className="h-4 w-4" />
-                        الجميع
+                        Everyone
                       </div>
                     </SelectItem>
                     <SelectItem value="friends">
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4" />
-                        الأصدقاء
+                        Friends
                       </div>
                     </SelectItem>
                     <SelectItem value="only_me">
                       <div className="flex items-center gap-2">
                         <Lock className="h-4 w-4" />
-                        أنا فقط
+                        Only me
                       </div>
                     </SelectItem>
                   </SelectContent>
@@ -289,11 +308,10 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
                   size="sm"
                 >
                   {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Send className="h-4 w-4 ml-2" />
+                    <Send className="h-4 w-4" />
                   )}
-                  نشر
                 </Button>
               </div>
             </div>

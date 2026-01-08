@@ -112,7 +112,7 @@ export default function Index() {
               
               <div className="bg-card rounded-lg p-4 shadow-sm">
                 <p className="text-sm text-muted-foreground">
-                  © 2024 تواصل. جميع الحقوق محفوظة.
+                  © 2024 MSK. All rights reserved.
                 </p>
               </div>
             </div>
