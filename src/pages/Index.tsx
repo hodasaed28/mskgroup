@@ -7,6 +7,7 @@ import Header from '@/components/layout/Header';
 import CreatePost from '@/components/feed/CreatePost';
 import PostCard from '@/components/feed/PostCard';
 import FriendsSidebar from '@/components/friends/FriendsSidebar';
+import StoriesBar from '@/components/stories/StoriesBar';
 import { useChatContext } from '@/contexts/ChatContext';
 import { Loader2 } from 'lucide-react';
 
@@ -78,6 +79,7 @@ export default function Index() {
 
           {/* Main Feed */}
           <main className="lg:col-span-6 space-y-4">
+            <StoriesBar currentUser={profile} />
             <CreatePost profile={profile} onPostCreated={handlePostCreated} />
             
             {posts.length === 0 ? (

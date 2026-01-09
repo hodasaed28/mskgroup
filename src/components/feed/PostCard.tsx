@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Heart, MessageCircle, Share2, Send, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Send, MoreHorizontal, Trash2, Pencil } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,8 @@ import { Post, Comment, Profile } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import EditPostDialog from './EditPostDialog';
+import SharePostDialog from './SharePostDialog';
 
 interface PostCardProps {
   post: Post;
@@ -28,6 +30,9 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [isLiked, setIsLiked] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [currentPost, setCurrentPost] = useState(post);
 
   useEffect(() => {
     fetchLikes();
@@ -103,8 +108,21 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
     onDelete?.();
   };
 
-  const profile = post.profiles;
-  const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: ar });
+  const handlePostUpdated = async () => {
+    const { data } = await supabase
+      .from('posts')
+      .select('*, profiles(*)')
+      .eq('id', post.id)
+      .single();
+    
+    if (data) {
+      setCurrentPost(data as unknown as Post);
+    }
+    onDelete?.(); // Refresh the feed
+  };
+
+  const profile = currentPost.profiles;
+  const timeAgo = formatDistanceToNow(new Date(currentPost.created_at), { addSuffix: true, locale: ar });
 
   return (
     <Card className="shadow-sm" dir="rtl">
@@ -134,6 +152,10 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+                  <Pencil className="h-4 w-4 ml-2" />
+                  تعديل المنشور
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleDelete} className="text-destructive">
                   <Trash2 className="h-4 w-4 ml-2" />
                   حذف المنشور
@@ -145,10 +167,10 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
       </CardHeader>
       
       <CardContent className="pb-3">
-        <p className="text-base whitespace-pre-wrap">{post.content}</p>
-        {post.image_url && (
+        <p className="text-base whitespace-pre-wrap">{currentPost.content}</p>
+        {currentPost.image_url && (
           <img 
-            src={post.image_url} 
+            src={currentPost.image_url} 
             alt="Post" 
             className="mt-3 rounded-lg w-full object-cover max-h-[500px]"
           />
@@ -175,7 +197,7 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
             <MessageCircle className="h-5 w-5 ml-2" />
             تعليق
           </Button>
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" onClick={() => setShowShareDialog(true)}>
             <Share2 className="h-5 w-5 ml-2" />
             مشاركة
           </Button>
@@ -225,6 +247,21 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
           </div>
         )}
       </CardFooter>
+
+      <EditPostDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        post={currentPost}
+        currentUser={currentUser}
+        onPostUpdated={handlePostUpdated}
+      />
+
+      <SharePostDialog
+        open={showShareDialog}
+        onOpenChange={setShowShareDialog}
+        post={currentPost}
+        currentUser={currentUser}
+      />
     </Card>
   );
 }
