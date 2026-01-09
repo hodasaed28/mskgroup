@@ -113,7 +113,7 @@ export default function SettingsPage() {
       .single();
 
     if (data) {
-      const profileData = data as unknown as Profile;
+      const profileData = data as unknown as Profile & { two_factor_enabled?: boolean };
       setProfile(profileData);
       setForm({
         username: profileData.username,
@@ -121,6 +121,7 @@ export default function SettingsPage() {
         bio: profileData.bio || '',
         is_private: profileData.is_private || false,
       });
+      setTwoFactorEnabled(profileData.two_factor_enabled || false);
     }
     setLoading(false);
   };
@@ -283,13 +284,27 @@ export default function SettingsPage() {
     navigate('/auth');
   };
 
-  const handle2FAToggle = (enabled: boolean) => {
+  const handle2FAToggle = async (enabled: boolean) => {
+    if (!user) return;
+    
+    const { error } = await supabase
+      .from('profiles')
+      .update({ two_factor_enabled: enabled } as any)
+      .eq('id', user.id);
+
+    if (error) {
+      toast({
+        title: t('common.error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setTwoFactorEnabled(enabled);
     toast({
       title: enabled ? t('settings.enable2FA') : t('settings.disable2FA'),
-      description: enabled 
-        ? t('settings.twoFactorDesc')
-        : t('settings.twoFactorDesc'),
+      description: t('settings.twoFactorDesc'),
     });
   };
 

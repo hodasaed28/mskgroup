@@ -88,10 +88,53 @@ export default function Auth() {
     path: ['confirmPassword'],
   });
 
+  // Handle OAuth callback and profile creation
   useEffect(() => {
-    if (user) {
-      navigate('/');
-    }
+    const handleOAuthCallback = async () => {
+      if (user) {
+        // Check if profile exists for this user
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+
+        if (!existingProfile) {
+          // Create profile from Google OAuth data
+          const metadata = user.user_metadata;
+          const username = metadata?.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`;
+          const fullName = metadata?.full_name || metadata?.name || '';
+          
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              username: username,
+              full_name: fullName,
+              avatar_url: metadata?.avatar_url || metadata?.picture || null,
+            });
+
+          if (profileError) {
+            console.error('Error creating profile:', profileError);
+            // If username exists, try with a unique suffix
+            if (profileError.code === '23505') {
+              await supabase
+                .from('profiles')
+                .insert({
+                  id: user.id,
+                  username: `${username}_${Date.now().toString(36)}`,
+                  full_name: fullName,
+                  avatar_url: metadata?.avatar_url || metadata?.picture || null,
+                });
+            }
+          }
+        }
+
+        navigate('/');
+      }
+    };
+
+    handleOAuthCallback();
   }, [user, navigate]);
 
   useEffect(() => {

@@ -257,6 +257,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_private: boolean
+          two_factor_enabled: boolean | null
           updated_at: string | null
           username: string
         }
@@ -267,6 +268,7 @@ export type Database = {
           full_name?: string | null
           id: string
           is_private?: boolean
+          two_factor_enabled?: boolean | null
           updated_at?: string | null
           username: string
         }
@@ -277,6 +279,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_private?: boolean
+          two_factor_enabled?: boolean | null
           updated_at?: string | null
           username?: string
         }
