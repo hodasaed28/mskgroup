@@ -15,6 +15,7 @@ import Notifications from "./pages/Notifications";
 import Search from "./pages/Search";
 import Settings from "./pages/Settings";
 import Reels from "./pages/Reels";
+import Post from "./pages/Post";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
                 <Route path="/search" element={<Search />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/reels" element={<Reels />} />
+                <Route path="/post/:id" element={<Post />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               <GlobalChat />
