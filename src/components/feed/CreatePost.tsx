@@ -100,15 +100,18 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
     if (videoInputRef.current) videoInputRef.current.value = '';
   };
 
-  const uploadFile = async (file: File, type: 'image' | 'video') => {
+  const uploadFile = async (file: File, type: 'image' | 'video', postVisibility: string) => {
     if (!profile) return null;
 
     const fileExt = file.name.split('.').pop();
     const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
     const filePath = `${type}s/${fileName}`;
+    
+    // Use private bucket for friends-only or private posts
+    const bucketName = postVisibility === 'everyone' ? 'media' : 'media-private';
 
     const { error } = await supabase.storage
-      .from('media')
+      .from(bucketName)
       .upload(filePath, file);
 
     if (error) {
@@ -117,7 +120,7 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
     }
 
     const { data: { publicUrl } } = supabase.storage
-      .from('media')
+      .from(bucketName)
       .getPublicUrl(filePath);
 
     return publicUrl;
@@ -133,14 +136,14 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
 
     try {
       if (imageFile) {
-        imageUrl = await uploadFile(imageFile, 'image');
+        imageUrl = await uploadFile(imageFile, 'image', visibility);
         if (!imageUrl) {
           throw new Error('Failed to upload image');
         }
       }
 
       if (videoFile) {
-        videoUrl = await uploadFile(videoFile, 'video');
+        videoUrl = await uploadFile(videoFile, 'video', visibility);
         if (!videoUrl) {
           throw new Error('Failed to upload video');
         }
