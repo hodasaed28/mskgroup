@@ -58,7 +58,8 @@ export default function SettingsPage() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  // Note: 2FA toggle removed - feature not actually implemented
+  // const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
@@ -138,7 +139,7 @@ export default function SettingsPage() {
         bio: profileData.bio || '',
         is_private: profileData.is_private || false,
       });
-      setTwoFactorEnabled(profileData.two_factor_enabled || false);
+      // Note: two_factor_enabled field not used - feature not implemented
       if (profileData.updated_at) {
         setLastUpdated(new Date(profileData.updated_at).toLocaleDateString());
       }
@@ -302,29 +303,10 @@ export default function SettingsPage() {
     navigate('/auth');
   };
 
-  const handle2FAToggle = async (enabled: boolean) => {
-    if (!user) return;
-    
-    const { error } = await supabase
-      .from('profiles')
-      .update({ two_factor_enabled: enabled } as any)
-      .eq('id', user.id);
-
-    if (error) {
-      toast({
-        title: t('common.error'),
-        description: error.message,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setTwoFactorEnabled(enabled);
-    toast({
-      title: enabled ? t('settings.enable2FA') : t('settings.disable2FA'),
-      description: t('settings.twoFactorDesc'),
-    });
-  };
+  // Note: 2FA toggle handler removed - feature not actually implemented
+  // Proper 2FA would require TOTP setup, QR codes, backup codes, and login verification
+  // This was removed to avoid giving users a false sense of security
+  // TODO: Implement proper 2FA using Supabase Auth MFA when needed
 
   if (authLoading || loading) {
     return (
@@ -454,21 +436,13 @@ export default function SettingsPage() {
       description: t('settings.securityLoginDesc'),
       content: (
         <div className="space-y-6 pt-4">
-          {/* 2FA */}
-          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
-            <div className="space-y-0.5">
-              <Label className="text-base">{t('settings.twoFactorAuth')}</Label>
-              <p className="text-sm text-muted-foreground">
-                {t('settings.twoFactorDesc')}
-              </p>
-            </div>
-            <Switch
-              checked={twoFactorEnabled}
-              onCheckedChange={handle2FAToggle}
-            />
-          </div>
-
-          <Separator />
+          {/* 2FA - Coming Soon */}
+          {/* TODO: Implement proper 2FA using Supabase Auth MFA
+              - TOTP secret generation
+              - QR code for authenticator apps  
+              - Backup codes
+              - Verification during login
+              Currently disabled to avoid false sense of security */}
 
           {/* Password Change */}
           <div className="space-y-4">
