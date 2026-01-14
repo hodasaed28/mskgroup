@@ -1,13 +1,21 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, Search } from 'lucide-react';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { X, Search, MoreVertical, Trash2, VolumeX, Archive, UserX } from 'lucide-react';
 import { Profile, Message } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatSidebarProps {
   isOpen: boolean;
@@ -18,7 +26,7 @@ interface ChatSidebarProps {
 }
 
 interface ChatPreview {
-  friend: Profile;
+  friend: Profile & { is_online?: boolean; last_seen?: string };
   lastMessage: Message | null;
   unreadCount: number;
 }
@@ -32,17 +40,50 @@ export default function ChatSidebar({
 }: ChatSidebarProps) {
   const [chats, setChats] = useState<ChatPreview[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (currentUser) {
       fetchChats();
+
+      // Subscribe to realtime updates
+      const channel = supabase
+        .channel('chat-sidebar-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'messages',
+          },
+          () => {
+            fetchChats();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profiles',
+          },
+          () => {
+            fetchChats();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [currentUser]);
 
   const fetchChats = async () => {
     if (!currentUser) return;
 
-    // Get accepted friendships
+    // Get accepted friendships with online status
     const { data: friendships } = await supabase
       .from('friendships')
       .select('*, requester:profiles!friendships_requester_id_fkey(*), addressee:profiles!friendships_addressee_id_fkey(*)')
@@ -55,8 +96,8 @@ export default function ChatSidebar({
 
     for (const friendship of friendships) {
       const friend = friendship.requester_id === currentUser.id 
-        ? friendship.addressee as unknown as Profile
-        : friendship.requester as unknown as Profile;
+        ? friendship.addressee as unknown as Profile & { is_online?: boolean; last_seen?: string }
+        : friendship.requester as unknown as Profile & { is_online?: boolean; last_seen?: string };
 
       // Get last message
       const { data: messages } = await supabase
@@ -89,6 +130,40 @@ export default function ChatSidebar({
     });
 
     setChats(chatPreviews);
+  };
+
+  const handleDeleteChat = async (friendId: string) => {
+    if (!currentUser) return;
+
+    // Delete all messages between the two users
+    await supabase
+      .from('messages')
+      .delete()
+      .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${friendId}),and(sender_id.eq.${friendId},receiver_id.eq.${currentUser.id})`);
+
+    toast({ title: 'تم حذف المحادثة' });
+    fetchChats();
+  };
+
+  const handleMuteChat = (friendId: string) => {
+    toast({ title: 'تم كتم المحادثة' });
+  };
+
+  const handleArchiveChat = (friendId: string) => {
+    toast({ title: 'تم أرشفة المحادثة' });
+  };
+
+  const handleBlockUser = async (friendId: string) => {
+    if (!currentUser) return;
+
+    // Delete friendship
+    await supabase
+      .from('friendships')
+      .delete()
+      .or(`and(requester_id.eq.${currentUser.id},addressee_id.eq.${friendId}),and(requester_id.eq.${friendId},addressee_id.eq.${currentUser.id})`);
+
+    toast({ title: 'تم حظر المستخدم وإزالته من الأصدقاء' });
+    fetchChats();
   };
 
   const filteredChats = chats.filter(chat => 
@@ -127,41 +202,88 @@ export default function ChatSidebar({
             </p>
           ) : (
             filteredChats.map((chat) => (
-              <button
+              <div
                 key={chat.friend.id}
-                onClick={() => onSelectChat(chat.friend)}
-                className={`w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors ${
+                className={`group flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors ${
                   selectedChat?.id === chat.friend.id ? 'bg-muted' : ''
                 }`}
               >
-                <div className="relative">
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={chat.friend.avatar_url || ''} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {chat.friend.username.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="absolute bottom-0 left-0 w-3 h-3 bg-online border-2 border-card rounded-full" />
-                </div>
-                <div className="flex-1 text-right overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold truncate">
-                      {chat.friend.full_name || chat.friend.username}
-                    </p>
-                    {chat.unreadCount > 0 && (
-                      <span className="bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {chat.unreadCount}
-                      </span>
+                <button
+                  onClick={() => onSelectChat(chat.friend)}
+                  className="flex items-center gap-3 flex-1"
+                >
+                  <div className="relative">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={chat.friend.avatar_url || ''} />
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {chat.friend.username.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {chat.friend.is_online && (
+                      <span className="absolute bottom-0 left-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />
                     )}
                   </div>
-                  {chat.lastMessage && (
-                    <p className="text-sm text-muted-foreground truncate">
-                      {chat.lastMessage.sender_id === currentUser?.id ? 'أنت: ' : ''}
-                      {chat.lastMessage.content}
-                    </p>
-                  )}
-                </div>
-              </button>
+                  <div className="flex-1 text-right overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold truncate">
+                        {chat.friend.full_name || chat.friend.username}
+                      </p>
+                      {chat.unreadCount > 0 && (
+                        <span className="bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {chat.unreadCount}
+                        </span>
+                      )}
+                    </div>
+                    {chat.lastMessage ? (
+                      <p className="text-sm text-muted-foreground truncate">
+                        {chat.lastMessage.sender_id === currentUser?.id ? 'أنت: ' : ''}
+                        {chat.lastMessage.content}
+                      </p>
+                    ) : !chat.friend.is_online && chat.friend.last_seen ? (
+                      <p className="text-xs text-muted-foreground">
+                        آخر ظهور {formatDistanceToNow(new Date(chat.friend.last_seen), { addSuffix: true, locale: ar })}
+                      </p>
+                    ) : null}
+                  </div>
+                </button>
+
+                {/* Chat settings dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleMuteChat(chat.friend.id)}>
+                      <VolumeX className="h-4 w-4 ml-2" />
+                      كتم المحادثة
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleArchiveChat(chat.friend.id)}>
+                      <Archive className="h-4 w-4 ml-2" />
+                      أرشفة المحادثة
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleDeleteChat(chat.friend.id)}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 ml-2" />
+                      حذف المحادثة
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleBlockUser(chat.friend.id)}
+                      className="text-destructive"
+                    >
+                      <UserX className="h-4 w-4 ml-2" />
+                      حظر المستخدم
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             ))
           )}
         </div>

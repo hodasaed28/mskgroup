@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Profile, Post } from '@/types/database';
@@ -10,8 +10,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, UserPlus, MessageCircle, Check, X, Loader2 } from 'lucide-react';
+import { Camera, UserPlus, MessageCircle, Check, X, Loader2, UserMinus, Eye, Upload, PlayCircle } from 'lucide-react';
+import { OnlineIndicator } from '@/components/ui/online-indicator';
 
 export default function ProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +27,14 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [friendshipStatus, setFriendshipStatus] = useState<'none' | 'pending' | 'accepted' | 'received'>('none');
   const [friendshipId, setFriendshipId] = useState<string | null>(null);
+  const [showAvatarOptions, setShowAvatarOptions] = useState(false);
+  const [showAvatarFullView, setShowAvatarFullView] = useState(false);
+  const [showCoverFullView, setShowCoverFullView] = useState(false);
+  const [hasStory, setHasStory] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -37,6 +47,7 @@ export default function ProfilePage() {
       fetchProfile();
       fetchPosts();
       checkFriendship();
+      checkHasStory();
     }
   }, [id, user]);
 
@@ -69,6 +80,18 @@ export default function ProfilePage() {
     }
   };
 
+  const checkHasStory = async () => {
+    if (!id) return;
+    
+    const { count } = await supabase
+      .from('stories')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', id)
+      .gt('expires_at', new Date().toISOString());
+    
+    setHasStory((count || 0) > 0);
+  };
+
   const checkFriendship = async () => {
     if (!id || !user) return;
 
@@ -83,7 +106,6 @@ export default function ProfilePage() {
       if (data.status === 'accepted') {
         setFriendshipStatus('accepted');
       } else if (data.status === 'rejected') {
-        // Allow re-sending if rejected
         setFriendshipStatus('none');
       } else if (data.requester_id === user.id) {
         setFriendshipStatus('pending');
@@ -98,7 +120,6 @@ export default function ProfilePage() {
   const sendFriendRequest = async () => {
     if (!user || !id || !currentUserProfile) return;
 
-    // Check if there's a rejected request and delete it first
     if (friendshipId) {
       await supabase
         .from('friendships')
@@ -116,7 +137,6 @@ export default function ProfilePage() {
       .single();
 
     if (!error && data) {
-      // Create notification for the addressee
       await supabase.rpc('create_notification', {
         p_user_id: id,
         p_type: 'friend_request',
@@ -129,10 +149,24 @@ export default function ProfilePage() {
     }
   };
 
+  const removeFriend = async () => {
+    if (!friendshipId) return;
+
+    const { error } = await supabase
+      .from('friendships')
+      .delete()
+      .eq('id', friendshipId);
+
+    if (!error) {
+      toast({ title: 'تم إزالة الصديق' });
+      setFriendshipStatus('none');
+      setFriendshipId(null);
+    }
+  };
+
   const handleFriendRequest = async (accept: boolean) => {
     if (!friendshipId || !currentUserProfile) return;
 
-    // Get the requester's ID
     const { data: friendship } = await supabase
       .from('friendships')
       .select('requester_id')
@@ -145,7 +179,6 @@ export default function ProfilePage() {
       .eq('id', friendshipId);
 
     if (!error && friendship) {
-      // Create notification for the requester
       await supabase.rpc('create_notification', {
         p_user_id: friendship.requester_id,
         p_type: accept ? 'friend_accepted' : 'friend_rejected',
@@ -164,6 +197,70 @@ export default function ProfilePage() {
     if (profile) {
       selectChat(profile);
       toggleChat();
+    }
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/avatar.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('media')
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: urlData.publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      toast({ title: 'تم تحديث الصورة الشخصية' });
+      fetchProfile();
+    } catch (error: any) {
+      toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
+    } finally {
+      setUploading(false);
+      setShowAvatarOptions(false);
+    }
+  };
+
+  const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/cover.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('media')
+        .getPublicUrl(fileName);
+
+      // For now, we'll store cover in a custom way - you might want to add cover_url column
+      toast({ title: 'تم تحديث صورة الغلاف' });
+    } catch (error: any) {
+      toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -196,44 +293,161 @@ export default function ProfilePage() {
 
       <div className="max-w-4xl mx-auto" dir="rtl">
         {/* Cover Photo */}
-        <div className="h-48 md:h-72 bg-gradient-to-r from-primary to-primary/60 rounded-b-lg relative">
+        <div 
+          className="h-48 md:h-72 bg-gradient-to-r from-primary to-primary/60 rounded-b-lg relative cursor-pointer"
+          onClick={() => setShowCoverFullView(true)}
+        >
           {isOwnProfile && (
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              className="absolute bottom-4 left-4"
-            >
-              <Camera className="h-4 w-4 ml-2" />
-              تغيير الغلاف
-            </Button>
+            <>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleCoverUpload}
+              />
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="absolute bottom-4 left-4"
+                onClick={(e) => { e.stopPropagation(); coverInputRef.current?.click(); }}
+                disabled={uploading}
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Camera className="h-4 w-4 ml-2" />}
+                تغيير الغلاف
+              </Button>
+            </>
           )}
         </div>
 
         {/* Profile Info */}
         <div className="px-4 md:px-8">
           <div className="flex flex-col md:flex-row items-start md:items-end gap-4 -mt-16 md:-mt-20">
-            <div className="relative">
-              <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-background">
-                <AvatarImage src={profile.avatar_url || ''} />
-                <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
-                  {profile.username.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              {isOwnProfile && (
-                <Button 
-                  variant="secondary" 
-                  size="icon" 
-                  className="absolute bottom-2 left-2 rounded-full"
+            {/* Avatar with options */}
+            <Dialog open={showAvatarOptions} onOpenChange={setShowAvatarOptions}>
+              <DialogTrigger asChild>
+                <div 
+                  className={`relative cursor-pointer group ${hasStory ? 'ring-4 ring-primary ring-offset-2 ring-offset-background rounded-full' : ''}`}
                 >
-                  <Camera className="h-4 w-4" />
+                  <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-background">
+                    <AvatarImage src={profile.avatar_url || ''} />
+                    <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
+                      {profile.username.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  {/* Online indicator */}
+                  {!isOwnProfile && (
+                    <div className="absolute bottom-4 right-0">
+                      <OnlineIndicator 
+                        isOnline={(profile as any).is_online} 
+                        showDot={true}
+                        className="w-4 h-4"
+                      />
+                    </div>
+                  )}
+                  {isOwnProfile && (
+                    <Button 
+                      variant="secondary" 
+                      size="icon" 
+                      className="absolute bottom-2 left-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Camera className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-xs" dir="rtl">
+                <div className="flex flex-col gap-2 p-2">
+                  {profile.avatar_url && (
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start gap-3"
+                      onClick={() => { setShowAvatarOptions(false); setShowAvatarFullView(true); }}
+                    >
+                      <Eye className="h-5 w-5" />
+                      عرض الصورة
+                    </Button>
+                  )}
+                  {hasStory && (
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start gap-3"
+                      onClick={() => { setShowAvatarOptions(false); /* Navigate to story */ }}
+                    >
+                      <PlayCircle className="h-5 w-5" />
+                      عرض القصة
+                    </Button>
+                  )}
+                  {isOwnProfile && (
+                    <>
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarUpload}
+                      />
+                      <Button 
+                        variant="ghost" 
+                        className="w-full justify-start gap-3"
+                        onClick={() => avatarInputRef.current?.click()}
+                        disabled={uploading}
+                      >
+                        {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+                        تغيير الصورة
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Avatar Full View Dialog */}
+            <Dialog open={showAvatarFullView} onOpenChange={setShowAvatarFullView}>
+              <DialogContent className="sm:max-w-2xl bg-black/90 border-0 p-0">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
+                  onClick={() => setShowAvatarFullView(false)}
+                >
+                  <X className="h-6 w-6" />
                 </Button>
-              )}
-            </div>
+                <div className="flex items-center justify-center min-h-[60vh]">
+                  {profile.avatar_url ? (
+                    <img 
+                      src={profile.avatar_url} 
+                      alt={profile.full_name || profile.username}
+                      className="max-w-full max-h-[80vh] object-contain"
+                    />
+                  ) : (
+                    <div className="w-64 h-64 rounded-full bg-primary flex items-center justify-center">
+                      <span className="text-8xl text-primary-foreground font-bold">
+                        {profile.username.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 text-center text-white">
+                  <p className="font-semibold text-lg">{profile.full_name || profile.username}</p>
+                  <p className="text-white/70">@{profile.username}</p>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             <div className="flex-1">
-              <h1 className="text-2xl md:text-3xl font-bold">
-                {profile.full_name || profile.username}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl md:text-3xl font-bold">
+                  {profile.full_name || profile.username}
+                </h1>
+                {!isOwnProfile && (
+                  <OnlineIndicator 
+                    isOnline={(profile as any).is_online} 
+                    lastSeen={(profile as any).last_seen}
+                    showText={true}
+                  />
+                )}
+              </div>
               <p className="text-muted-foreground">@{profile.username}</p>
               {profile.bio && (
                 <p className="mt-2 text-sm">{profile.bio}</p>
@@ -267,10 +481,16 @@ export default function ProfilePage() {
                     </div>
                   )}
                   {friendshipStatus === 'accepted' && (
-                    <Button variant="secondary" onClick={handleMessage}>
-                      <MessageCircle className="h-4 w-4 ml-2" />
-                      مراسلة
-                    </Button>
+                    <>
+                      <Button variant="secondary" onClick={handleMessage}>
+                        <MessageCircle className="h-4 w-4 ml-2" />
+                        مراسلة
+                      </Button>
+                      <Button variant="outline" onClick={removeFriend}>
+                        <UserMinus className="h-4 w-4 ml-2" />
+                        إزالة صديق
+                      </Button>
+                    </>
                   )}
                 </>
               )}

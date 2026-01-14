@@ -5,7 +5,17 @@ export interface Profile {
   avatar_url: string | null;
   bio: string | null;
   is_private: boolean;
+  is_online?: boolean;
+  last_seen?: string;
   created_at: string;
+  updated_at: string;
+}
+
+export interface TypingIndicator {
+  id: string;
+  user_id: string;
+  chat_with_id: string;
+  is_typing: boolean;
   updated_at: string;
 }
 

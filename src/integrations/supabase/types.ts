@@ -256,7 +256,9 @@ export type Database = {
           created_at: string | null
           full_name: string | null
           id: string
+          is_online: boolean | null
           is_private: boolean
+          last_seen: string | null
           two_factor_enabled: boolean | null
           updated_at: string | null
           username: string
@@ -267,7 +269,9 @@ export type Database = {
           created_at?: string | null
           full_name?: string | null
           id: string
+          is_online?: boolean | null
           is_private?: boolean
+          last_seen?: string | null
           two_factor_enabled?: boolean | null
           updated_at?: string | null
           username: string
@@ -278,7 +282,9 @@ export type Database = {
           created_at?: string | null
           full_name?: string | null
           id?: string
+          is_online?: boolean | null
           is_private?: boolean
+          last_seen?: string | null
           two_factor_enabled?: boolean | null
           updated_at?: string | null
           username?: string
@@ -424,6 +430,45 @@ export type Database = {
           {
             foreignKeyName: "story_views_viewer_id_fkey"
             columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      typing_indicators: {
+        Row: {
+          chat_with_id: string
+          id: string
+          is_typing: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          chat_with_id: string
+          id?: string
+          is_typing?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          chat_with_id?: string
+          id?: string
+          is_typing?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "typing_indicators_chat_with_id_fkey"
+            columns: ["chat_with_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "typing_indicators_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
