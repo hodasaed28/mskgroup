@@ -16,6 +16,7 @@ import {
 import { Home, Users, MessageCircle, Bell, Search, LogOut, User, Settings, Film } from 'lucide-react';
 import { Profile } from '@/types/database';
 import { LanguageSelector } from '@/components/LanguageSelector';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface HeaderProps {
   profile: Profile | null;
@@ -93,6 +94,7 @@ export default function Header({ profile, notificationCount, messageCount, onMes
             </Link>
           </Button>
 
+          <ThemeToggle />
           <LanguageSelector />
 
           <DropdownMenu>
