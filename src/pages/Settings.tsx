@@ -15,6 +15,9 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
+import { PasswordInput } from '@/components/PasswordInput';
+import { validatePassword } from '@/lib/passwordValidation';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
   Loader2, Camera, Shield, Lock, User, Trash2, Globe, Moon, Sun, 
   Smartphone, Bell, Settings, ChevronDown, LogOut, Download
@@ -57,10 +60,10 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
   // Note: 2FA toggle removed - feature not actually implemented
   // const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [downloadingData, setDownloadingData] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Notification preferences state
@@ -97,28 +100,53 @@ export default function SettingsPage() {
     }
   }, [user]);
 
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-      applyTheme(savedTheme);
-    }
-  }, []);
+  // Download user data function
+  const handleDownloadData = async () => {
+    if (!user) return;
+    
+    setDownloadingData(true);
+    try {
+      // Fetch user's data from all tables
+      const [profileRes, postsRes, commentsRes, friendsRes, messagesRes, notificationsRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('posts').select('*').eq('user_id', user.id),
+        supabase.from('comments').select('*').eq('user_id', user.id),
+        supabase.from('friendships').select('*').or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`),
+        supabase.from('messages').select('*').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`),
+        supabase.from('notifications').select('*').eq('user_id', user.id),
+      ]);
 
-  const applyTheme = (newTheme: 'light' | 'dark' | 'system') => {
-    const root = document.documentElement;
-    if (newTheme === 'system') {
-      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.classList.toggle('dark', systemDark);
-    } else {
-      root.classList.toggle('dark', newTheme === 'dark');
-    }
-    localStorage.setItem('theme', newTheme);
-  };
+      const userData = {
+        exported_at: new Date().toISOString(),
+        profile: profileRes.data,
+        posts: postsRes.data || [],
+        comments: commentsRes.data || [],
+        friendships: friendsRes.data || [],
+        messages: messagesRes.data || [],
+        notifications: notificationsRes.data || [],
+      };
 
-  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
-    setTheme(newTheme);
-    applyTheme(newTheme);
+      // Create downloadable JSON file
+      const blob = new Blob([JSON.stringify(userData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `msk-data-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({ title: t('common.success'), description: 'Your data has been downloaded' });
+    } catch (error: any) {
+      toast({
+        title: t('common.error'),
+        description: error.message || 'Failed to download data',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingData(false);
+    }
   };
 
   const fetchProfile = async () => {
@@ -244,10 +272,12 @@ export default function SettingsPage() {
       return;
     }
 
-    if (passwordForm.newPassword.length < 6) {
+    // Validate new password with complex requirements
+    const passwordValidation = validatePassword(passwordForm.newPassword);
+    if (!passwordValidation.isValid) {
       toast({
         title: t('common.error'),
-        description: t('settings.passwordTooShort'),
+        description: passwordValidation.errors[0],
         variant: 'destructive',
       });
       return;
@@ -449,29 +479,28 @@ export default function SettingsPage() {
             <h4 className="font-medium">{t('settings.changePassword')}</h4>
             <div className="space-y-2">
               <Label htmlFor="currentPassword">{t('settings.currentPassword')}</Label>
-              <Input
+              <PasswordInput
                 id="currentPassword"
-                type="password"
                 value={passwordForm.currentPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                onChange={(value) => setPasswordForm({ ...passwordForm, currentPassword: value })}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="newPassword">{t('settings.newPassword')}</Label>
-              <Input
+              <PasswordInput
                 id="newPassword"
-                type="password"
                 value={passwordForm.newPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                onChange={(value) => setPasswordForm({ ...passwordForm, newPassword: value })}
+                showStrength={true}
+                showRequirements={true}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">{t('settings.confirmNewPassword')}</Label>
-              <Input
+              <PasswordInput
                 id="confirmPassword"
-                type="password"
                 value={passwordForm.confirmPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                onChange={(value) => setPasswordForm({ ...passwordForm, confirmPassword: value })}
               />
             </div>
             <Button
@@ -548,31 +577,7 @@ export default function SettingsPage() {
           {/* Theme */}
           <div className="space-y-3">
             <Label>{t('settings.theme')}</Label>
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                variant={theme === 'light' ? 'default' : 'outline'}
-                onClick={() => handleThemeChange('light')}
-                className="flex-1 min-w-[100px]"
-              >
-                <Sun className="h-4 w-4 mr-2" />
-                {t('settings.lightMode')}
-              </Button>
-              <Button
-                variant={theme === 'dark' ? 'default' : 'outline'}
-                onClick={() => handleThemeChange('dark')}
-                className="flex-1 min-w-[100px]"
-              >
-                <Moon className="h-4 w-4 mr-2" />
-                {t('settings.darkMode')}
-              </Button>
-              <Button
-                variant={theme === 'system' ? 'default' : 'outline'}
-                onClick={() => handleThemeChange('system')}
-                className="flex-1 min-w-[100px]"
-              >
-                {t('settings.systemTheme')}
-              </Button>
-            </div>
+            <ThemeToggle variant="buttons" />
           </div>
         </div>
       ),
@@ -594,8 +599,13 @@ export default function SettingsPage() {
 
           {/* Actions */}
           <div className="space-y-3">
-            <Button variant="outline" className="w-full justify-start gap-2">
-              <Download className="h-4 w-4" />
+            <Button 
+              variant="outline" 
+              className="w-full justify-start gap-2"
+              onClick={handleDownloadData}
+              disabled={downloadingData}
+            >
+              {downloadingData ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               {t('settings.downloadData')}
             </Button>
 

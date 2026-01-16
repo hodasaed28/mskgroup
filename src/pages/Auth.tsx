@@ -12,6 +12,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Users, MessageCircle, Heart, Share2, Mail, Phone, Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { LanguageSelector } from '@/components/LanguageSelector';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { PasswordInput } from '@/components/PasswordInput';
+import { validatePassword } from '@/lib/passwordValidation';
 import { countries, Country } from '@/data/countries';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -73,10 +76,13 @@ export default function Auth() {
       ? z.string().email(t('auth.invalidCredentials'))
       : z.string().optional(),
     password: authMethod === 'email'
-      ? z.string().min(6, t('settings.passwordTooShort'))
+      ? z.string().min(8, 'Password must be at least 8 characters')
+          .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+          .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+          .regex(/[0-9]/, 'Password must contain at least one number')
       : z.string().optional(),
     confirmPassword: authMethod === 'email'
-      ? z.string().min(6, t('settings.passwordTooShort'))
+      ? z.string().min(8, 'Password must be at least 8 characters')
       : z.string().optional(),
     username: z.string().min(3, t('auth.dataError')),
     fullName: z.string().min(2, t('auth.dataError')),
@@ -310,6 +316,19 @@ export default function Auth() {
       return;
     }
 
+    // Additional password validation with leaked password check
+    if (authMethod === 'email') {
+      const passwordValidation = validatePassword(signUpForm.password);
+      if (!passwordValidation.isValid) {
+        toast({
+          title: t('auth.dataError'),
+          description: passwordValidation.errors[0],
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     if (authMethod === 'phone') {
       await handlePhoneSignUp();
       return;
@@ -520,7 +539,8 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-primary/5 flex items-center justify-center p-4" dir={isRTL ? 'rtl' : 'ltr'}>
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <ThemeToggle />
         <LanguageSelector />
       </div>
       
@@ -707,24 +727,20 @@ export default function Auth() {
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="signup-password">{t('auth.password')}</Label>
-                            <Input
+                            <PasswordInput
                               id="signup-password"
-                              type="password"
-                              placeholder="••••••••"
                               value={signUpForm.password}
-                              onChange={(e) => setSignUpForm({ ...signUpForm, password: e.target.value })}
-                              required
+                              onChange={(value) => setSignUpForm({ ...signUpForm, password: value })}
+                              showStrength={true}
+                              showRequirements={true}
                             />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="signup-confirm-password">{t('auth.confirmPassword')}</Label>
-                            <Input
+                            <PasswordInput
                               id="signup-confirm-password"
-                              type="password"
-                              placeholder="••••••••"
                               value={signUpForm.confirmPassword}
-                              onChange={(e) => setSignUpForm({ ...signUpForm, confirmPassword: e.target.value })}
-                              required
+                              onChange={(value) => setSignUpForm({ ...signUpForm, confirmPassword: value })}
                             />
                           </div>
                         </>
