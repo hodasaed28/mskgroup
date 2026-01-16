@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -7,8 +7,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Copy, Send, Check, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Copy, Send, Check, Loader2, Share, RefreshCw } from 'lucide-react';
 import { Post, Profile } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +20,7 @@ interface SharePostDialogProps {
   onOpenChange: (open: boolean) => void;
   post: Post;
   currentUser: Profile | null;
+  onShareComplete?: () => void;
 }
 
 interface Friend {
@@ -31,7 +34,8 @@ export default function SharePostDialog({
   open, 
   onOpenChange, 
   post,
-  currentUser 
+  currentUser,
+  onShareComplete
 }: SharePostDialogProps) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
@@ -39,15 +43,17 @@ export default function SharePostDialog({
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [repostText, setRepostText] = useState('');
+  const [reposting, setReposting] = useState(false);
   const { toast } = useToast();
 
   const postUrl = `${window.location.origin}/post/${post.id}`;
 
-  useState(() => {
+  useEffect(() => {
     if (open && currentUser) {
       fetchFriends();
     }
-  });
+  }, [open, currentUser]);
 
   const fetchFriends = async () => {
     if (!currentUser) return;
@@ -87,6 +93,49 @@ export default function SharePostDialog({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleShareToFeed = async () => {
+    if (!currentUser) return;
+
+    setReposting(true);
+    try {
+      // Create a new post that references the original
+      const { error: postError } = await supabase
+        .from('posts')
+        .insert({
+          user_id: currentUser.id,
+          content: repostText ? `${repostText}\n\n📢 مشاركة منشور: ${postUrl}` : `📢 مشاركة منشور: ${postUrl}`,
+          image_url: null,
+          video_url: null,
+          visibility: 'everyone',
+        });
+
+      if (postError) throw postError;
+
+      // Increment share count
+      await supabase
+        .from('posts')
+        .update({ share_count: (post.share_count || 0) + 1 } as any)
+        .eq('id', post.id);
+
+      toast({
+        title: 'تم النشر',
+        description: 'تم مشاركة المنشور على صفحتك',
+      });
+
+      onShareComplete?.();
+      onOpenChange(false);
+      setRepostText('');
+    } catch (error: any) {
+      toast({
+        title: 'خطأ',
+        description: error.message || 'فشل مشاركة المنشور',
+        variant: 'destructive',
+      });
+    } finally {
+      setReposting(false);
+    }
+  };
+
   const toggleFriend = (friendId: string) => {
     setSelectedFriends(prev => {
       const newSet = new Set(prev);
@@ -117,11 +166,18 @@ export default function SharePostDialog({
 
       if (error) throw error;
 
+      // Increment share count
+      await supabase
+        .from('posts')
+        .update({ share_count: (post.share_count || 0) + selectedFriends.size } as any)
+        .eq('id', post.id);
+
       toast({
         title: 'تم الإرسال',
         description: `تم مشاركة المنشور مع ${selectedFriends.size} صديق`,
       });
 
+      onShareComplete?.();
       setSelectedFriends(new Set());
       onOpenChange(false);
     } catch (error: any) {
@@ -147,31 +203,64 @@ export default function SharePostDialog({
           <DialogTitle>مشاركة المنشور</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Copy Link */}
-          <div className="flex gap-2">
-            <Input 
-              value={postUrl}
-              readOnly
-              className="text-sm"
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleCopyLink}
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            </Button>
-          </div>
+        <Tabs defaultValue="link" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="link">نسخ الرابط</TabsTrigger>
+            <TabsTrigger value="feed">مشاركة للحائط</TabsTrigger>
+            <TabsTrigger value="friends">إرسال لصديق</TabsTrigger>
+          </TabsList>
 
-          <div className="border-t pt-4">
-            <h4 className="text-sm font-medium mb-3">إرسال إلى الأصدقاء</h4>
-            
+          <TabsContent value="link" className="space-y-4 mt-4">
+            <div className="flex gap-2">
+              <Input 
+                value={postUrl}
+                readOnly
+                className="text-sm"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleCopyLink}
+              >
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground text-center">
+              انسخ الرابط لمشاركته في أي مكان
+            </p>
+          </TabsContent>
+
+          <TabsContent value="feed" className="space-y-4 mt-4">
+            <Textarea
+              placeholder="أضف تعليقاً على المشاركة... (اختياري)"
+              value={repostText}
+              onChange={(e) => setRepostText(e.target.value)}
+              className="min-h-[100px]"
+            />
+            <Button 
+              onClick={handleShareToFeed}
+              disabled={reposting}
+              className="w-full"
+            >
+              {reposting ? (
+                <>
+                  <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                  جاري المشاركة...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 ml-2" />
+                  مشاركة على حائطي
+                </>
+              )}
+            </Button>
+          </TabsContent>
+
+          <TabsContent value="friends" className="space-y-4 mt-4">
             <Input
               placeholder="بحث عن صديق..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="mb-3"
             />
 
             {loading ? (
@@ -220,7 +309,7 @@ export default function SharePostDialog({
               <Button 
                 onClick={handleSendToFriends}
                 disabled={sending}
-                className="w-full mt-3"
+                className="w-full"
               >
                 {sending ? (
                   <>
@@ -235,8 +324,8 @@ export default function SharePostDialog({
                 )}
               </Button>
             )}
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

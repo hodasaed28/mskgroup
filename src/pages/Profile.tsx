@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Profile, Post } from '@/types/database';
+import { Profile, Post, SavedPost, Friendship } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/layout/Header';
 import PostCard from '@/components/feed/PostCard';
@@ -12,7 +12,7 @@ import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, UserPlus, MessageCircle, Check, X, Loader2, UserMinus, Eye, Upload, PlayCircle } from 'lucide-react';
+import { Camera, UserPlus, MessageCircle, Check, X, Loader2, UserMinus, Eye, Upload, PlayCircle, Bookmark, Users, Image as ImageIcon } from 'lucide-react';
 import { OnlineIndicator } from '@/components/ui/online-indicator';
 
 export default function ProfilePage() {
@@ -24,6 +24,11 @@ export default function ProfilePage() {
   const { profile: currentUserProfile, notificationCount, messageCount, toggleChat, selectChat } = useChatContext();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [friends, setFriends] = useState<Profile[]>([]);
+  const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
+  const [friendCount, setFriendCount] = useState(0);
+  const [postCount, setPostCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [friendshipStatus, setFriendshipStatus] = useState<'none' | 'pending' | 'accepted' | 'received'>('none');
   const [friendshipId, setFriendshipId] = useState<string | null>(null);
@@ -32,9 +37,12 @@ export default function ProfilePage() {
   const [showCoverFullView, setShowCoverFullView] = useState(false);
   const [hasStory, setHasStory] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const isOwnProfile = user?.id === id;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -46,10 +54,14 @@ export default function ProfilePage() {
     if (id && user) {
       fetchProfile();
       fetchPosts();
+      fetchFriends();
       checkFriendship();
       checkHasStory();
+      if (isOwnProfile) {
+        fetchSavedPosts();
+      }
     }
-  }, [id, user]);
+  }, [id, user, isOwnProfile]);
 
   const fetchProfile = async () => {
     if (!id) return;
@@ -61,7 +73,7 @@ export default function ProfilePage() {
       .single();
     
     if (data) {
-      setProfile(data as Profile);
+      setProfile(data as unknown as Profile);
     }
     setLoading(false);
   };
@@ -69,14 +81,64 @@ export default function ProfilePage() {
   const fetchPosts = async () => {
     if (!id) return;
 
-    const { data } = await supabase
+    const { data, count } = await supabase
       .from('posts')
-      .select('*, profiles(*)')
+      .select('*, profiles(*)', { count: 'exact' })
       .eq('user_id', id)
       .order('created_at', { ascending: false });
     
     if (data) {
       setPosts(data as unknown as Post[]);
+      setPostCount(count || 0);
+      
+      // Extract photos from posts
+      const postPhotos = data
+        .filter((p: any) => p.image_url)
+        .map((p: any) => p.image_url as string);
+      setPhotos(postPhotos);
+    }
+  };
+
+  const fetchFriends = async () => {
+    if (!id) return;
+
+    const { data, count } = await supabase
+      .from('friendships')
+      .select(`
+        requester_id,
+        addressee_id,
+        requester:profiles!friendships_requester_id_fkey(id, username, full_name, avatar_url, is_online),
+        addressee:profiles!friendships_addressee_id_fkey(id, username, full_name, avatar_url, is_online)
+      `, { count: 'exact' })
+      .eq('status', 'accepted')
+      .or(`requester_id.eq.${id},addressee_id.eq.${id}`);
+
+    if (data) {
+      const friendsList: Profile[] = data.map(friendship => {
+        const friend = friendship.requester_id === id 
+          ? friendship.addressee 
+          : friendship.requester;
+        return friend as unknown as Profile;
+      });
+      setFriends(friendsList);
+      setFriendCount(count || 0);
+    }
+  };
+
+  const fetchSavedPosts = async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('saved_posts')
+      .select(`
+        *,
+        post:posts(*, profiles(*))
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (data) {
+      setSavedPosts(data as unknown as SavedPost[]);
     }
   };
 
@@ -93,7 +155,7 @@ export default function ProfilePage() {
   };
 
   const checkFriendship = async () => {
-    if (!id || !user) return;
+    if (!id || !user || id === user.id) return;
 
     const { data } = await supabase
       .from('friendships')
@@ -161,6 +223,7 @@ export default function ProfilePage() {
       toast({ title: 'تم إزالة الصديق' });
       setFriendshipStatus('none');
       setFriendshipId(null);
+      fetchFriends();
     }
   };
 
@@ -190,6 +253,7 @@ export default function ProfilePage() {
 
       toast({ title: accept ? 'تم قبول الطلب' : 'تم رفض الطلب' });
       checkFriendship();
+      fetchFriends();
     }
   };
 
@@ -207,7 +271,7 @@ export default function ProfilePage() {
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/avatar.${fileExt}`;
+      const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('media')
@@ -243,7 +307,7 @@ export default function ProfilePage() {
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/cover.${fileExt}`;
+      const fileName = `${user.id}/cover-${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('media')
@@ -255,16 +319,21 @@ export default function ProfilePage() {
         .from('media')
         .getPublicUrl(fileName);
 
-      // For now, we'll store cover in a custom way - you might want to add cover_url column
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ cover_url: urlData.publicUrl } as any)
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
       toast({ title: 'تم تحديث صورة الغلاف' });
+      fetchProfile();
     } catch (error: any) {
       toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
     } finally {
       setUploading(false);
     }
   };
-
-  const isOwnProfile = user?.id === id;
 
   if (authLoading || loading) {
     return (
@@ -294,8 +363,9 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto" dir="rtl">
         {/* Cover Photo */}
         <div 
-          className="h-48 md:h-72 bg-gradient-to-r from-primary to-primary/60 rounded-b-lg relative cursor-pointer"
-          onClick={() => setShowCoverFullView(true)}
+          className="h-48 md:h-72 bg-gradient-to-r from-primary to-primary/60 rounded-b-lg relative cursor-pointer overflow-hidden"
+          onClick={() => (profile as any).cover_url && setShowCoverFullView(true)}
+          style={(profile as any).cover_url ? { backgroundImage: `url(${(profile as any).cover_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
         >
           {isOwnProfile && (
             <>
@@ -320,6 +390,29 @@ export default function ProfilePage() {
           )}
         </div>
 
+        {/* Cover Full View */}
+        <Dialog open={showCoverFullView} onOpenChange={setShowCoverFullView}>
+          <DialogContent className="sm:max-w-4xl bg-black/90 border-0 p-0">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
+              onClick={() => setShowCoverFullView(false)}
+            >
+              <X className="h-6 w-6" />
+            </Button>
+            <div className="flex items-center justify-center min-h-[60vh]">
+              {(profile as any).cover_url && (
+                <img 
+                  src={(profile as any).cover_url} 
+                  alt="Cover"
+                  className="max-w-full max-h-[80vh] object-contain"
+                />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Profile Info */}
         <div className="px-4 md:px-8">
           <div className="flex flex-col md:flex-row items-start md:items-end gap-4 -mt-16 md:-mt-20">
@@ -335,7 +428,6 @@ export default function ProfilePage() {
                       {profile.username.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  {/* Online indicator */}
                   {!isOwnProfile && (
                     <div className="absolute bottom-4 right-0">
                       <OnlineIndicator 
@@ -372,7 +464,7 @@ export default function ProfilePage() {
                     <Button 
                       variant="ghost" 
                       className="w-full justify-start gap-3"
-                      onClick={() => { setShowAvatarOptions(false); /* Navigate to story */ }}
+                      onClick={() => { setShowAvatarOptions(false); }}
                     >
                       <PlayCircle className="h-5 w-5" />
                       عرض القصة
@@ -452,6 +544,19 @@ export default function ProfilePage() {
               {profile.bio && (
                 <p className="mt-2 text-sm">{profile.bio}</p>
               )}
+              {/* Stats */}
+              <div className="flex items-center gap-4 mt-3 text-sm">
+                <div className="flex items-center gap-1">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-semibold">{friendCount}</span>
+                  <span className="text-muted-foreground">صديق</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-semibold">{postCount}</span>
+                  <span className="text-muted-foreground">منشور</span>
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-2">
@@ -499,11 +604,17 @@ export default function ProfilePage() {
 
           {/* Tabs */}
           <Tabs defaultValue="posts" className="mt-6">
-            <TabsList className="w-full justify-start">
+            <TabsList className="w-full justify-start flex-wrap">
               <TabsTrigger value="posts">المنشورات</TabsTrigger>
               <TabsTrigger value="about">حول</TabsTrigger>
               <TabsTrigger value="friends">الأصدقاء</TabsTrigger>
               <TabsTrigger value="photos">الصور</TabsTrigger>
+              {isOwnProfile && (
+                <TabsTrigger value="saved">
+                  <Bookmark className="h-4 w-4 ml-1" />
+                  المحفوظات
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="posts" className="mt-4 space-y-4">
@@ -543,16 +654,114 @@ export default function ProfilePage() {
             </TabsContent>
 
             <TabsContent value="friends" className="mt-4">
-              <Card className="p-6 text-center text-muted-foreground">
-                قريباً...
-              </Card>
+              {friends.length === 0 ? (
+                <Card className="p-8 text-center text-muted-foreground">
+                  لا يوجد أصدقاء بعد
+                </Card>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {friends.map((friend) => (
+                    <Link key={friend.id} to={`/profile/${friend.id}`}>
+                      <Card className="p-4 hover:bg-muted transition-colors">
+                        <div className="flex flex-col items-center text-center gap-2">
+                          <div className="relative">
+                            <Avatar className="h-16 w-16">
+                              <AvatarImage src={friend.avatar_url || ''} />
+                              <AvatarFallback className="bg-primary text-primary-foreground">
+                                {friend.username.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            {(friend as any).is_online && (
+                              <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm truncate max-w-full">
+                              {friend.full_name || friend.username}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              @{friend.username}
+                            </p>
+                          </div>
+                        </div>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="photos" className="mt-4">
-              <Card className="p-6 text-center text-muted-foreground">
-                لا توجد صور بعد
-              </Card>
+              {photos.length === 0 ? (
+                <Card className="p-8 text-center text-muted-foreground">
+                  لا توجد صور بعد
+                </Card>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                    {photos.map((photo, index) => (
+                      <div 
+                        key={index}
+                        className="aspect-square cursor-pointer overflow-hidden rounded-lg hover:opacity-90 transition-opacity"
+                        onClick={() => setSelectedPhoto(photo)}
+                      >
+                        <img 
+                          src={photo} 
+                          alt={`Photo ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Photo Viewer */}
+                  <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
+                    <DialogContent className="sm:max-w-4xl bg-black/90 border-0 p-0">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
+                        onClick={() => setSelectedPhoto(null)}
+                      >
+                        <X className="h-6 w-6" />
+                      </Button>
+                      <div className="flex items-center justify-center min-h-[60vh]">
+                        {selectedPhoto && (
+                          <img 
+                            src={selectedPhoto} 
+                            alt="Photo"
+                            className="max-w-full max-h-[80vh] object-contain"
+                          />
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </>
+              )}
             </TabsContent>
+
+            {isOwnProfile && (
+              <TabsContent value="saved" className="mt-4 space-y-4">
+                {savedPosts.length === 0 ? (
+                  <Card className="p-8 text-center text-muted-foreground">
+                    <Bookmark className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>لا توجد منشورات محفوظة</p>
+                    <p className="text-sm mt-1">احفظ المنشورات التي تعجبك لتجدها هنا</p>
+                  </Card>
+                ) : (
+                  savedPosts.map((saved) => (
+                    saved.post && (
+                      <PostCard 
+                        key={saved.id} 
+                        post={saved.post as unknown as Post} 
+                        currentUser={currentUserProfile}
+                        onDelete={fetchSavedPosts}
+                      />
+                    )
+                  ))
+                )}
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>

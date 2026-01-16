@@ -3,6 +3,7 @@ export interface Profile {
   username: string;
   full_name: string | null;
   avatar_url: string | null;
+  cover_url: string | null;
   bio: string | null;
   is_private: boolean;
   is_online?: boolean;
@@ -26,9 +27,27 @@ export interface Post {
   image_url: string | null;
   video_url: string | null;
   visibility: 'everyone' | 'friends' | 'only_me';
+  share_count: number;
+  original_post_id?: string | null;
   created_at: string;
   updated_at: string;
   profiles?: Profile;
+}
+
+export interface SavedPost {
+  id: string;
+  user_id: string;
+  post_id: string;
+  collection_name: string;
+  created_at: string;
+  post?: Post;
+}
+
+export interface SavedCollection {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
 }
 
 export interface Comment {
