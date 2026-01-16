@@ -214,6 +214,7 @@ export type Database = {
           created_at: string | null
           id: string
           image_url: string | null
+          share_count: number
           updated_at: string | null
           user_id: string
           video_url: string | null
@@ -224,6 +225,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           image_url?: string | null
+          share_count?: number
           updated_at?: string | null
           user_id: string
           video_url?: string | null
@@ -234,6 +236,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           image_url?: string | null
+          share_count?: number
           updated_at?: string | null
           user_id?: string
           video_url?: string | null
@@ -253,6 +256,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           bio: string | null
+          cover_url: string | null
           created_at: string | null
           full_name: string | null
           id: string
@@ -266,6 +270,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           bio?: string | null
+          cover_url?: string | null
           created_at?: string | null
           full_name?: string | null
           id: string
@@ -279,6 +284,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           bio?: string | null
+          cover_url?: string | null
           created_at?: string | null
           full_name?: string | null
           id?: string
@@ -355,6 +361,74 @@ export type Database = {
           },
           {
             foreignKeyName: "reels_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_collections: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_collections_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_posts: {
+        Row: {
+          collection_name: string | null
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          collection_name?: string | null
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          collection_name?: string | null
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_posts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_posts_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"

@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Heart, MessageCircle, Share2, Send, MoreHorizontal, Trash2, Pencil } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Send, MoreHorizontal, Trash2, Pencil, Bookmark } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,13 +30,16 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [isLiked, setIsLiked] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [currentPost, setCurrentPost] = useState(post);
+  const [shareCount, setShareCount] = useState(post.share_count || 0);
 
   useEffect(() => {
     fetchLikes();
     fetchComments();
+    checkIfSaved();
   }, [post.id]);
 
   const fetchLikes = async () => {
@@ -64,6 +67,19 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
     }
   };
 
+  const checkIfSaved = async () => {
+    if (!currentUser) return;
+    
+    const { data } = await supabase
+      .from('saved_posts')
+      .select('id')
+      .eq('post_id', post.id)
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+    
+    setIsSaved(!!data);
+  };
+
   const handleLike = async () => {
     if (!currentUser) return;
 
@@ -81,6 +97,28 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
         .insert({ post_id: post.id, user_id: currentUser.id });
       setLikes(prev => [...prev, currentUser.id]);
       setIsLiked(true);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!currentUser) return;
+
+    if (isSaved) {
+      await supabase
+        .from('saved_posts')
+        .delete()
+        .eq('post_id', post.id)
+        .eq('user_id', currentUser.id);
+      setIsSaved(false);
+    } else {
+      await supabase
+        .from('saved_posts')
+        .insert({ 
+          post_id: post.id, 
+          user_id: currentUser.id,
+          collection_name: 'All Saved'
+        });
+      setIsSaved(true);
     }
   };
 
@@ -121,6 +159,10 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
     onDelete?.(); // Refresh the feed
   };
 
+  const handleShareComplete = () => {
+    setShareCount(prev => prev + 1);
+  };
+
   const profile = currentPost.profiles;
   const timeAgo = formatDistanceToNow(new Date(currentPost.created_at), { addSuffix: true, locale: ar });
 
@@ -144,25 +186,35 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
               <p className="text-sm text-muted-foreground">{timeAgo}</p>
             </div>
           </div>
-          {currentUser?.id === post.user_id && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <MoreHorizontal className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
-                  <Pencil className="h-4 w-4 ml-2" />
-                  تعديل المنشور
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-                  <Trash2 className="h-4 w-4 ml-2" />
-                  حذف المنشور
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <div className="flex items-center gap-1">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={handleSave}
+              className={isSaved ? 'text-primary' : ''}
+            >
+              <Bookmark className={`h-5 w-5 ${isSaved ? 'fill-current' : ''}`} />
+            </Button>
+            {currentUser?.id === post.user_id && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <MoreHorizontal className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+                    <Pencil className="h-4 w-4 ml-2" />
+                    تعديل المنشور
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                    <Trash2 className="h-4 w-4 ml-2" />
+                    حذف المنشور
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
       </CardHeader>
       
@@ -175,12 +227,22 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
             className="mt-3 rounded-lg w-full object-cover max-h-[500px]"
           />
         )}
+        {currentPost.video_url && (
+          <video
+            src={currentPost.video_url}
+            controls
+            className="mt-3 rounded-lg w-full max-h-[500px]"
+          />
+        )}
       </CardContent>
 
       <CardFooter className="flex-col gap-3 pt-0">
         <div className="flex items-center justify-between w-full text-sm text-muted-foreground pb-2 border-b">
           <span>{likes.length} إعجاب</span>
-          <span>{comments.length} تعليق</span>
+          <div className="flex items-center gap-3">
+            <span>{comments.length} تعليق</span>
+            {shareCount > 0 && <span>{shareCount} مشاركة</span>}
+          </div>
         </div>
         
         <div className="flex items-center justify-around w-full">
@@ -261,6 +323,7 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
         onOpenChange={setShowShareDialog}
         post={currentPost}
         currentUser={currentUser}
+        onShareComplete={handleShareComplete}
       />
     </Card>
   );
