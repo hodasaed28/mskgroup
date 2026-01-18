@@ -9,6 +9,7 @@ import { Profile, Message } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { VideoCallDialog } from './VideoCallDialog';
 
 interface ChatWindowProps {
   friend: Profile;
@@ -27,6 +28,8 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
     is_online: false,
     last_seen: null
   });
+  const [showVideoCall, setShowVideoCall] = useState(false);
+  const [showVoiceCall, setShowVoiceCall] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   const navigate = useNavigate();
@@ -307,10 +310,20 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20"
+            onClick={() => setShowVoiceCall(true)}
+          >
             <Phone className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20"
+            onClick={() => setShowVideoCall(true)}
+          >
             <Video className="h-4 w-4" />
           </Button>
           {onMinimize && (
@@ -389,6 +402,24 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
           <Send className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Video Call Dialog */}
+      <VideoCallDialog
+        open={showVideoCall}
+        onClose={() => setShowVideoCall(false)}
+        friend={friend}
+        currentUser={currentUser}
+        callType="video"
+      />
+
+      {/* Voice Call Dialog */}
+      <VideoCallDialog
+        open={showVoiceCall}
+        onClose={() => setShowVoiceCall(false)}
+        friend={friend}
+        currentUser={currentUser}
+        callType="voice"
+      />
     </div>
   );
 }
