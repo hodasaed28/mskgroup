@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PasswordInput } from '@/components/PasswordInput';
 import { validatePassword } from '@/lib/passwordValidation';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { TwoFactorSetup } from '@/components/settings/TwoFactorSetup';
 import { 
   Loader2, Camera, Shield, Lock, User, Trash2, Globe, Moon, Sun, 
   Smartphone, Bell, Settings, ChevronDown, LogOut, Download
@@ -60,8 +61,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  // Note: 2FA toggle removed - feature not actually implemented
-  // const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [downloadingData, setDownloadingData] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -167,7 +167,7 @@ export default function SettingsPage() {
         bio: profileData.bio || '',
         is_private: profileData.is_private || false,
       });
-      // Note: two_factor_enabled field not used - feature not implemented
+      setTwoFactorEnabled(profileData.two_factor_enabled || false);
       if (profileData.updated_at) {
         setLastUpdated(new Date(profileData.updated_at).toLocaleDateString());
       }
@@ -333,10 +333,11 @@ export default function SettingsPage() {
     navigate('/auth');
   };
 
-  // Note: 2FA toggle handler removed - feature not actually implemented
-  // Proper 2FA would require TOTP setup, QR codes, backup codes, and login verification
-  // This was removed to avoid giving users a false sense of security
-  // TODO: Implement proper 2FA using Supabase Auth MFA when needed
+  // Handle 2FA status change
+  const handleTwoFactorChange = (enabled: boolean) => {
+    setTwoFactorEnabled(enabled);
+    fetchProfile();
+  };
 
   if (authLoading || loading) {
     return (
@@ -466,13 +467,17 @@ export default function SettingsPage() {
       description: t('settings.securityLoginDesc'),
       content: (
         <div className="space-y-6 pt-4">
-          {/* 2FA - Coming Soon */}
-          {/* TODO: Implement proper 2FA using Supabase Auth MFA
-              - TOTP secret generation
-              - QR code for authenticator apps  
-              - Backup codes
-              - Verification during login
-              Currently disabled to avoid false sense of security */}
+          {/* 2FA Setup */}
+          {user && (
+            <TwoFactorSetup
+              userId={user.id}
+              userEmail={user.email || ''}
+              isEnabled={twoFactorEnabled}
+              onStatusChange={handleTwoFactorChange}
+            />
+          )}
+
+          <Separator />
 
           {/* Password Change */}
           <div className="space-y-4">
