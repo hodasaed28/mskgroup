@@ -9,7 +9,7 @@ import { Profile, Message } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { VideoCallDialog } from './VideoCallDialog';
+import { WebRTCVideoCall } from './WebRTCVideoCall';
 
 interface ChatWindowProps {
   friend: Profile;
@@ -404,7 +404,7 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
       </div>
 
       {/* Video Call Dialog */}
-      <VideoCallDialog
+      <WebRTCVideoCall
         open={showVideoCall}
         onClose={() => setShowVideoCall(false)}
         friend={friend}
@@ -413,7 +413,7 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
       />
 
       {/* Voice Call Dialog */}
-      <VideoCallDialog
+      <WebRTCVideoCall
         open={showVoiceCall}
         onClose={() => setShowVoiceCall(false)}
         friend={friend}

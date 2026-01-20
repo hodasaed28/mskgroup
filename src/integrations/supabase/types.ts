@@ -549,11 +549,60 @@ export type Database = {
           },
         ]
       }
+      webrtc_signals: {
+        Row: {
+          call_type: string
+          callee_id: string
+          caller_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          signal_data: Json | null
+          signal_type: string
+        }
+        Insert: {
+          call_type: string
+          callee_id: string
+          caller_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          signal_data?: Json | null
+          signal_type: string
+        }
+        Update: {
+          call_type?: string
+          callee_id?: string
+          caller_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          signal_data?: Json | null
+          signal_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webrtc_signals_callee_id_fkey"
+            columns: ["callee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webrtc_signals_caller_id_fkey"
+            columns: ["caller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      cleanup_expired_signals: { Args: never; Returns: undefined }
       create_notification: {
         Args: {
           p_content: string
