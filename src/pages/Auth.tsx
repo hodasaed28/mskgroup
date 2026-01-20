@@ -17,6 +17,7 @@ import { PasswordInput } from '@/components/PasswordInput';
 import { validatePassword } from '@/lib/passwordValidation';
 import { countries, Country } from '@/data/countries';
 import { supabase } from '@/integrations/supabase/client';
+import { TwoFactorVerify } from '@/components/auth/TwoFactorVerify';
 import {
   Select,
   SelectContent,
@@ -31,7 +32,7 @@ import {
 } from '@/components/ui/input-otp';
 
 type AuthMethod = 'email' | 'phone' | 'google';
-type AuthStep = 'credentials' | 'otp';
+type AuthStep = 'credentials' | 'otp' | '2fa';
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +49,7 @@ export default function Auth() {
   const [otp, setOtp] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
   const [phoneVerificationId, setPhoneVerificationId] = useState<string | null>(null);
+  const [pending2FAUser, setPending2FAUser] = useState<{ id: string; email: string } | null>(null);
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '', phone: '' });
   const [signUpForm, setSignUpForm] = useState({ 
@@ -286,21 +288,44 @@ export default function Auth() {
     }
 
     setIsLoading(true);
-    const { error } = await signIn(loginForm.email, loginForm.password);
-    setIsLoading(false);
-
+    const { error, data } = await supabase.auth.signInWithPassword({
+      email: loginForm.email,
+      password: loginForm.password,
+    });
+    
     if (error) {
+      setIsLoading(false);
       toast({
         title: t('auth.error'),
         description: t('auth.invalidCredentials'),
         variant: 'destructive',
       });
-    } else {
-      toast({
-        title: t('auth.welcomeBack'),
-        description: t('auth.loginSuccess'),
-      });
+      return;
     }
+
+    // Check if user has 2FA enabled
+    if (data.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('two_factor_enabled')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profile && (profile as any).two_factor_enabled) {
+        // Sign out temporarily and prompt for 2FA
+        await supabase.auth.signOut();
+        setPending2FAUser({ id: data.user.id, email: data.user.email || loginForm.email });
+        setAuthStep('2fa');
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    setIsLoading(false);
+    toast({
+      title: t('auth.welcomeBack'),
+      description: t('auth.loginSuccess'),
+    });
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -484,6 +509,40 @@ export default function Auth() {
     </div>
   );
 
+  const render2FAStep = () => (
+    <TwoFactorVerify
+      userId={pending2FAUser?.id || ''}
+      userEmail={pending2FAUser?.email || ''}
+      onVerified={async () => {
+        // Re-authenticate after 2FA verification
+        setIsLoading(true);
+        const { error } = await supabase.auth.signInWithPassword({
+          email: loginForm.email,
+          password: loginForm.password,
+        });
+        setIsLoading(false);
+        
+        if (error) {
+          toast({
+            title: t('auth.error'),
+            description: t('auth.invalidCredentials'),
+            variant: 'destructive',
+          });
+          setAuthStep('credentials');
+        } else {
+          toast({
+            title: t('auth.welcomeBack'),
+            description: t('auth.loginSuccess'),
+          });
+        }
+      }}
+      onBack={() => {
+        setAuthStep('credentials');
+        setPending2FAUser(null);
+      }}
+    />
+  );
+
   const renderPhoneInput = (value: string, onChange: (val: string) => void) => (
     <div className="flex gap-2" dir="ltr">
       <Select
@@ -592,7 +651,7 @@ export default function Auth() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {authStep === 'otp' ? renderOtpStep() : (
+            {authStep === '2fa' ? render2FAStep() : authStep === 'otp' ? renderOtpStep() : (
               <>
                 {/* Google Sign In */}
                 <Button
