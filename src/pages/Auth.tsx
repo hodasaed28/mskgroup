@@ -99,6 +99,11 @@ export default function Auth() {
   // Handle OAuth callback and profile creation
   useEffect(() => {
     const handleOAuthCallback = async () => {
+      // Skip if we're in 2FA step - we handle navigation after 2FA verification
+      if (authStep === '2fa') {
+        return;
+      }
+      
       if (user) {
         // Check if profile exists for this user
         const { data: existingProfile } = await supabase
@@ -143,7 +148,7 @@ export default function Auth() {
     };
 
     handleOAuthCallback();
-  }, [user, navigate]);
+  }, [user, navigate, authStep]);
 
   useEffect(() => {
     if (resendTimer > 0) {
@@ -516,7 +521,7 @@ export default function Auth() {
       onVerified={async () => {
         // Re-authenticate after 2FA verification
         setIsLoading(true);
-        const { error } = await supabase.auth.signInWithPassword({
+        const { error, data } = await supabase.auth.signInWithPassword({
           email: loginForm.email,
           password: loginForm.password,
         });
@@ -529,11 +534,15 @@ export default function Auth() {
             variant: 'destructive',
           });
           setAuthStep('credentials');
+          setPending2FAUser(null);
         } else {
+          // Successfully authenticated after 2FA - navigate directly
           toast({
             title: t('auth.welcomeBack'),
             description: t('auth.loginSuccess'),
           });
+          setPending2FAUser(null);
+          navigate('/');
         }
       }}
       onBack={() => {
