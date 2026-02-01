@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import { Loader2, Shield, ArrowLeft } from 'lucide-react';
 import * as OTPAuth from 'otpauth';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Card,
   CardContent,
@@ -36,12 +37,29 @@ export function TwoFactorVerify({ userId, userEmail, onVerified, onBack }: TwoFa
 
     setLoading(true);
     try {
-      const savedSecret = localStorage.getItem(`2fa_secret_${userId}`);
-      
-      if (!savedSecret) {
+      // Get 2FA secret from server
+      const { data: verifyData, error: verifyError } = await supabase.rpc('verify_two_factor_code', {
+        p_user_id: userId,
+        p_code: verificationCode,
+      });
+
+      if (verifyError) {
         toast({
           title: t('common.error'),
-          description: '2FA configuration not found. Please contact support.',
+          description: verifyError.message || 'Verification failed',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Type assertion for the RPC response
+      const response = verifyData as { valid: boolean; error?: string; secret?: string; backup_codes?: string[] | string } | null;
+
+      if (!response?.valid) {
+        toast({
+          title: t('common.error'),
+          description: response?.error || '2FA configuration not found. Please contact support.',
           variant: 'destructive',
         });
         setLoading(false);
@@ -51,33 +69,37 @@ export function TwoFactorVerify({ userId, userEmail, onVerified, onBack }: TwoFa
       let isValid = false;
 
       if (useBackupCode) {
-        // Check backup codes
-        const backupCodesStr = localStorage.getItem(`2fa_backup_${userId}`);
-        const storedBackupCodes: string[] = backupCodesStr ? JSON.parse(backupCodesStr) : [];
+        // Check backup codes from server
+        const storedBackupCodes: string[] = response.backup_codes ? 
+          (typeof response.backup_codes === 'string' ? JSON.parse(response.backup_codes) : response.backup_codes) : [];
+        
         const codeIndex = storedBackupCodes.findIndex(
           code => code.toUpperCase() === verificationCode.toUpperCase()
         );
         
         if (codeIndex !== -1) {
           isValid = true;
-          // Remove used backup code
-          storedBackupCodes.splice(codeIndex, 1);
-          localStorage.setItem(`2fa_backup_${userId}`, JSON.stringify(storedBackupCodes));
+          
+          // Consume the backup code on the server
+          await supabase.rpc('consume_backup_code', {
+            p_user_id: userId,
+            p_code: verificationCode,
+          });
           
           toast({
             title: 'Backup code used',
-            description: `${storedBackupCodes.length} backup codes remaining.`,
+            description: `${storedBackupCodes.length - 1} backup codes remaining.`,
           });
         }
       } else {
-        // Verify TOTP code
+        // Verify TOTP code using secret from server
         const totp = new OTPAuth.TOTP({
           issuer: 'MSK Group',
           label: userEmail,
           algorithm: 'SHA1',
           digits: 6,
           period: 30,
-          secret: OTPAuth.Secret.fromBase32(savedSecret),
+          secret: OTPAuth.Secret.fromBase32(response.secret || ''),
         });
 
         isValid = totp.validate({ token: verificationCode, window: 1 }) !== null;

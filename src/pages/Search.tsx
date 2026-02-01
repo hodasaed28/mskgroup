@@ -68,9 +68,9 @@ export default function SearchPage() {
 
     setLoading(true);
 
-    // Search people
+    // Search people - use public view to exclude sensitive fields
     const { data: peopleData } = await supabase
-      .from('profiles')
+      .from('profiles_public')
       .select('*')
       .or(`username.ilike.%${sanitizedQuery}%,full_name.ilike.%${sanitizedQuery}%`)
       .limit(20);

@@ -66,14 +66,28 @@ export default function ProfilePage() {
   const fetchProfile = async () => {
     if (!id) return;
     
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (data) {
-      setProfile(data as unknown as Profile);
+    // For own profile, fetch all fields; for others, exclude sensitive fields
+    if (isOwnProfile) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (data) {
+        setProfile(data as unknown as Profile);
+      }
+    } else {
+      // Use the public view that excludes sensitive fields (is_online, last_seen, two_factor_enabled)
+      const { data } = await supabase
+        .from('profiles_public')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (data) {
+        setProfile(data as unknown as Profile);
+      }
     }
     setLoading(false);
   };

@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +37,6 @@ export function TwoFactorSetup({ userId, userEmail, isEnabled, onStatusChange }:
   const [secret, setSecret] = useState<string>('');
   const [verificationCode, setVerificationCode] = useState('');
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
-  const [showBackupCodes, setShowBackupCodes] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [step, setStep] = useState<'qr' | 'verify' | 'backup'>('qr');
 
@@ -101,7 +99,7 @@ export function TwoFactorSetup({ userId, userEmail, isEnabled, onStatusChange }:
 
     setLoading(true);
     try {
-      // Verify the code
+      // Verify the code locally first
       const totp = new OTPAuth.TOTP({
         issuer: 'MSK Group',
         label: userEmail,
@@ -123,20 +121,13 @@ export function TwoFactorSetup({ userId, userEmail, isEnabled, onStatusChange }:
         return;
       }
 
-      // Save to database - store the secret and backup codes
-      // In production, these should be encrypted
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          two_factor_enabled: true,
-        } as any)
-        .eq('id', userId);
+      // Save to database using secure RPC function (server-side storage)
+      const { error } = await supabase.rpc('enable_two_factor', {
+        p_secret: secret,
+        p_backup_codes: JSON.stringify(backupCodes),
+      });
 
       if (error) throw error;
-
-      // Store secret in localStorage (in production, use secure storage)
-      localStorage.setItem(`2fa_secret_${userId}`, secret);
-      localStorage.setItem(`2fa_backup_${userId}`, JSON.stringify(backupCodes));
 
       setStep('backup');
       onStatusChange(true);
@@ -160,49 +151,59 @@ export function TwoFactorSetup({ userId, userEmail, isEnabled, onStatusChange }:
 
     setLoading(true);
     try {
-      // Verify the code first
-      const savedSecret = localStorage.getItem(`2fa_secret_${userId}`);
-      if (savedSecret) {
-        const totp = new OTPAuth.TOTP({
-          issuer: 'MSK Group',
-          label: userEmail,
-          algorithm: 'SHA1',
-          digits: 6,
-          period: 30,
-          secret: OTPAuth.Secret.fromBase32(savedSecret),
+      // Get the secret from server for verification
+      const { data: verifyData, error: verifyError } = await supabase.rpc('verify_two_factor_code', {
+        p_user_id: userId,
+        p_code: verificationCode,
+      });
+
+      if (verifyError) throw verifyError;
+
+      // Type assertion for the RPC response
+      const response = verifyData as { valid: boolean; error?: string; secret?: string; backup_codes?: string[] | string } | null;
+
+      if (!response?.valid) {
+        toast({
+          title: t('common.error'),
+          description: response?.error || '2FA not enabled',
+          variant: 'destructive',
         });
+        setLoading(false);
+        return;
+      }
 
-        const isValid = totp.validate({ token: verificationCode, window: 1 }) !== null;
+      // Verify the code
+      const totp = new OTPAuth.TOTP({
+        issuer: 'MSK Group',
+        label: userEmail,
+        algorithm: 'SHA1',
+        digits: 6,
+        period: 30,
+        secret: OTPAuth.Secret.fromBase32(response.secret || ''),
+      });
 
-        if (!isValid) {
-          // Check backup codes
-          const backupCodesStr = localStorage.getItem(`2fa_backup_${userId}`);
-          const storedBackupCodes = backupCodesStr ? JSON.parse(backupCodesStr) : [];
-          if (!storedBackupCodes.includes(verificationCode.toUpperCase())) {
-            toast({
-              title: t('common.error'),
-              description: 'Invalid verification code.',
-              variant: 'destructive',
-            });
-            setLoading(false);
-            return;
-          }
+      const isValid = totp.validate({ token: verificationCode, window: 1 }) !== null;
+
+      if (!isValid) {
+        // Check backup codes
+        const storedBackupCodes: string[] = response.backup_codes ? 
+          (typeof response.backup_codes === 'string' ? JSON.parse(response.backup_codes) : response.backup_codes) : [];
+        
+        if (!storedBackupCodes.some(code => code.toUpperCase() === verificationCode.toUpperCase())) {
+          toast({
+            title: t('common.error'),
+            description: 'Invalid verification code.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
         }
       }
 
-      // Disable in database
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          two_factor_enabled: false,
-        } as any)
-        .eq('id', userId);
+      // Disable 2FA using secure RPC function (clears server-side storage)
+      const { error } = await supabase.rpc('disable_two_factor');
 
       if (error) throw error;
-
-      // Remove stored secrets
-      localStorage.removeItem(`2fa_secret_${userId}`);
-      localStorage.removeItem(`2fa_backup_${userId}`);
 
       setShowDisableDialog(false);
       setVerificationCode('');
