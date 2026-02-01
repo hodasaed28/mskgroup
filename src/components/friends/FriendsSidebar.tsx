@@ -74,8 +74,9 @@ export default function FriendsSidebar({ currentUser }: FriendsSidebarProps) {
       connectedIds.add(f.addressee_id);
     });
 
+    // Use public view to exclude sensitive fields
     const { data } = await supabase
-      .from('profiles')
+      .from('profiles_public')
       .select('*')
       .limit(5);
 
