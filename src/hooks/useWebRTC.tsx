@@ -1,26 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Profile } from '@/types/database';
-
-// Free STUN/TURN servers for NAT traversal
-const ICE_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun3.l.google.com:19302' },
-  { urls: 'stun:stun4.l.google.com:19302' },
-  // Open TURN server (for testing - in production use your own)
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-];
+import { useTurnCredentials } from './useTurnCredentials';
 
 export type CallState = 'idle' | 'calling' | 'ringing' | 'connected' | 'ended';
 export type CallType = 'video' | 'voice';
@@ -56,6 +37,9 @@ export function useWebRTC({ currentUser, friend, callType, onCallEnded }: UseWeb
   const [isVideoOff, setIsVideoOff] = useState(callType === 'voice');
   const [callDuration, setCallDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  // Get ICE servers from hook (includes TURN from secrets)
+  const iceServers = useTurnCredentials();
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -95,7 +79,7 @@ export function useWebRTC({ currentUser, friend, callType, onCallEnded }: UseWeb
 
   // Initialize peer connection
   const createPeerConnection = useCallback(() => {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const pc = new RTCPeerConnection({ iceServers });
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -126,7 +110,7 @@ export function useWebRTC({ currentUser, friend, callType, onCallEnded }: UseWeb
 
     peerConnectionRef.current = pc;
     return pc;
-  }, [sendSignal]);
+  }, [iceServers, sendSignal]);
 
   // Get local media stream
   const getLocalStream = useCallback(async () => {

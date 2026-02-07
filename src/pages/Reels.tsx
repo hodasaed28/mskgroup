@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Reel } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,10 +19,13 @@ import {
 import { Heart, MessageCircle, Share2, Volume2, VolumeX, Plus, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'react-router-dom';
+import { ReelCommentsSheet } from '@/components/reels/ReelCommentsSheet';
+import { ShareReelDialog } from '@/components/reels/ShareReelDialog';
 
 export default function ReelsPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
 
   const { profile, notificationCount, messageCount, toggleChat } = useChatContext();
@@ -32,9 +35,13 @@ export default function ReelsPage() {
   const [muted, setMuted] = useState(true);
   const [likes, setLikes] = useState<{ [key: string]: number }>({});
   const [likedReels, setLikedReels] = useState<Set<string>>(new Set());
+  const [commentCounts, setCommentCounts] = useState<{ [key: string]: number }>({});
   const [isUploading, setIsUploading] = useState(false);
   const [caption, setCaption] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [selectedReelId, setSelectedReelId] = useState<string | null>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const videoRefs = useRef<{ [key: number]: HTMLVideoElement }>({});
@@ -50,6 +57,17 @@ export default function ReelsPage() {
       fetchReels();
     }
   }, [user]);
+
+  useEffect(() => {
+    // Navigate to specific reel if ID is in URL
+    const reelId = searchParams.get('id');
+    if (reelId && reels.length > 0) {
+      const index = reels.findIndex(r => r.id === reelId);
+      if (index !== -1) {
+        setCurrentIndex(index);
+      }
+    }
+  }, [searchParams, reels]);
 
   useEffect(() => {
     // Auto-play current video
@@ -90,6 +108,20 @@ export default function ReelsPage() {
         setLikes(likeCounts);
         setLikedReels(userLikes);
       }
+
+      // Fetch comment counts
+      const { data: commentsData } = await supabase
+        .from('reel_comments')
+        .select('reel_id')
+        .in('reel_id', reelIds);
+
+      if (commentsData) {
+        const counts: { [key: string]: number } = {};
+        commentsData.forEach(c => {
+          counts[c.reel_id] = (counts[c.reel_id] || 0) + 1;
+        });
+        setCommentCounts(counts);
+      }
     }
     setLoading(false);
   };
@@ -118,6 +150,16 @@ export default function ReelsPage() {
       setLikedReels(prev => new Set(prev).add(reelId));
       setLikes(prev => ({ ...prev, [reelId]: (prev[reelId] || 0) + 1 }));
     }
+  };
+
+  const handleOpenComments = (reelId: string) => {
+    setSelectedReelId(reelId);
+    setCommentsOpen(true);
+  };
+
+  const handleOpenShare = (reelId: string) => {
+    setSelectedReelId(reelId);
+    setShareOpen(true);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -363,14 +405,17 @@ export default function ReelsPage() {
                             variant="ghost"
                             size="icon"
                             className="text-white hover:bg-white/20 rounded-full"
+                            onClick={() => handleOpenComments(reel.id)}
                           >
                             <MessageCircle className="h-7 w-7" />
                           </Button>
+                          <span className="text-white text-sm">{commentCounts[reel.id] || 0}</span>
 
                           <Button
                             variant="ghost"
                             size="icon"
                             className="text-white hover:bg-white/20 rounded-full"
+                            onClick={() => handleOpenShare(reel.id)}
                           >
                             <Share2 className="h-7 w-7" />
                           </Button>
@@ -397,6 +442,26 @@ export default function ReelsPage() {
           )}
         </div>
       </div>
+
+      {/* Comments Sheet */}
+      {selectedReelId && (
+        <ReelCommentsSheet
+          open={commentsOpen}
+          onOpenChange={setCommentsOpen}
+          reelId={selectedReelId}
+          currentUser={profile}
+        />
+      )}
+
+      {/* Share Dialog */}
+      {selectedReelId && (
+        <ShareReelDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          reelId={selectedReelId}
+          currentUser={profile}
+        />
+      )}
     </div>
   );
 }

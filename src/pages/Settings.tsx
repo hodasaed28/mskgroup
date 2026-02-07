@@ -74,6 +74,8 @@ export default function SettingsPage() {
     messages: true,
     stories: true,
   });
+  const [savingPrefs, setSavingPrefs] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const [form, setForm] = useState({
     username: '',
@@ -97,8 +99,58 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       fetchProfile();
+      fetchNotificationPrefs();
     }
   }, [user]);
+
+  const fetchNotificationPrefs = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('notification_preferences')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+    
+    if (data) {
+      setNotificationPrefs({
+        likes: data.likes,
+        comments: data.comments,
+        friendRequests: data.friend_requests,
+        messages: data.messages,
+        stories: data.stories,
+      });
+    }
+  };
+
+  const saveNotificationPrefs = async () => {
+    if (!user) return;
+    
+    setSavingPrefs(true);
+    
+    const { error } = await supabase
+      .from('notification_preferences')
+      .upsert({
+        user_id: user.id,
+        likes: notificationPrefs.likes,
+        comments: notificationPrefs.comments,
+        friend_requests: notificationPrefs.friendRequests,
+        messages: notificationPrefs.messages,
+        stories: notificationPrefs.stories,
+      }, { onConflict: 'user_id' });
+    
+    setSavingPrefs(false);
+    
+    if (error) {
+      toast({
+        title: t('common.error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({ title: t('settings.saved') });
+    }
+  };
 
   // Download user data function
   const handleDownloadData = async () => {
@@ -325,12 +377,31 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
-    toast({
-      title: t('common.error'),
-      description: t('settings.deleteAccountWarning'),
-    });
-    await signOut();
-    navigate('/auth');
+    setDeletingAccount(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-account');
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data?.success) {
+        toast({ title: t('settings.accountDeleted') || 'Account deleted successfully' });
+        await signOut();
+        navigate('/auth');
+      } else {
+        throw new Error(data?.error || 'Failed to delete account');
+      }
+    } catch (error: any) {
+      toast({
+        title: t('common.error'),
+        description: error.message || 'Failed to delete account',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   // Handle 2FA status change
@@ -550,6 +621,16 @@ export default function SettingsPage() {
               />
             </div>
           ))}
+          <Button onClick={saveNotificationPrefs} disabled={savingPrefs} className="w-full sm:w-auto">
+            {savingPrefs ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                {t('settings.saving')}
+              </>
+            ) : (
+              t('settings.saveChanges')
+            )}
+          </Button>
         </div>
       ),
     },
