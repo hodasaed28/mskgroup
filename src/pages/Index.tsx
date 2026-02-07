@@ -8,6 +8,7 @@ import CreatePost from '@/components/feed/CreatePost';
 import PostCard from '@/components/feed/PostCard';
 import FriendsSidebar from '@/components/friends/FriendsSidebar';
 import StoriesBar from '@/components/stories/StoriesBar';
+import { TrendingHashtags } from '@/components/feed/TrendingHashtags';
 import { useChatContext } from '@/contexts/ChatContext';
 import { Loader2 } from 'lucide-react';
 
@@ -99,18 +100,10 @@ export default function Index() {
             )}
           </main>
 
-          {/* Right Sidebar - Ads/Trending */}
+          {/* Right Sidebar - Trending */}
           <aside className="hidden lg:block lg:col-span-3">
             <div className="sticky top-20 space-y-4" dir="rtl">
-              <div className="bg-card rounded-lg p-4 shadow-sm">
-                <h3 className="font-semibold mb-3">الأكثر تداولاً</h3>
-                <div className="space-y-2 text-sm">
-                  <p className="text-primary hover:underline cursor-pointer">#تقنية</p>
-                  <p className="text-primary hover:underline cursor-pointer">#رياضة</p>
-                  <p className="text-primary hover:underline cursor-pointer">#أخبار</p>
-                  <p className="text-primary hover:underline cursor-pointer">#ترفيه</p>
-                </div>
-              </div>
+              <TrendingHashtags />
               
               <div className="bg-card rounded-lg p-4 shadow-sm">
                 <p className="text-sm text-muted-foreground">
