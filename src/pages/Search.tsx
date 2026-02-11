@@ -240,32 +240,38 @@ export default function SearchPage() {
 
               <TabsContent value="posts" className="space-y-3">
                 {results.posts.map((post) => (
-                  <Card key={post.id} className="p-4">
-                    <div className="flex gap-3">
-                      <Link to={`/profile/${post.user_id}`}>
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={post.profiles?.avatar_url || ''} />
-                          <AvatarFallback className="bg-primary text-primary-foreground">
-                            {post.profiles?.username?.charAt(0).toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                      </Link>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Link to={`/profile/${post.user_id}`} className="font-semibold hover:underline">
-                            {post.profiles?.full_name || post.profiles?.username}
-                          </Link>
-                          <span className="text-sm text-muted-foreground">
-                            {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                          </span>
+                  <Link key={post.id} to={`/post/${post.id}`} className="block">
+                    <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                      <div className="flex gap-3">
+                        <div onClick={(e) => { e.preventDefault(); navigate(`/profile/${post.user_id}`); }}>
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={post.profiles?.avatar_url || ''} />
+                            <AvatarFallback className="bg-primary text-primary-foreground">
+                              {post.profiles?.username?.charAt(0).toUpperCase() || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
                         </div>
-                        <p className="mt-1">{post.content}</p>
-                        {post.image_url && (
-                          <img src={post.image_url} alt="" className="mt-2 rounded-lg max-h-48 object-cover" />
-                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold hover:underline" onClick={(e) => { e.preventDefault(); navigate(`/profile/${post.user_id}`); }}>
+                              {post.profiles?.full_name || post.profiles?.username}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                            </span>
+                          </div>
+                          <p className="mt-1">{post.content}</p>
+                          {post.image_url && (
+                            <img src={post.image_url} alt="" className="mt-2 rounded-lg max-h-48 object-cover" />
+                          )}
+                          <div className="flex items-center gap-4 mt-2 text-muted-foreground text-sm">
+                            <span className="flex items-center gap-1"><Heart className="h-4 w-4" /></span>
+                            <span className="flex items-center gap-1"><MessageCircle className="h-4 w-4" /></span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </Card>
+                    </Card>
+                  </Link>
                 ))}
                 {results.posts.length === 0 && searchParams.get('q') && (
                   <p className="text-center text-muted-foreground py-8">No posts found</p>

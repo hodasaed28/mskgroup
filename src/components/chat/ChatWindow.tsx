@@ -4,12 +4,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, Send, Phone, Video, Minus, Check, CheckCheck } from 'lucide-react';
+import { X, Send, Phone, Video, Minus, Check, CheckCheck, Paperclip, Image as ImageIcon, Smile } from 'lucide-react';
 import { Profile, Message } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { WebRTCVideoCall } from './WebRTCVideoCall';
+import { EmojiPicker } from '@/components/ui/emoji-picker';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatWindowProps {
   friend: Profile;
@@ -30,9 +32,13 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
   });
   const [showVideoCall, setShowVideoCall] = useState(false);
   const [showVoiceCall, setShowVoiceCall] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchMessages();
@@ -237,6 +243,46 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
     }
   };
 
+  const handleFileUpload = async (file: File, type: 'image' | 'file') => {
+    setUploadingFile(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentUser.id}/${Date.now()}.${fileExt}`;
+      const filePath = `chat-attachments/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('media')
+        .getPublicUrl(filePath);
+
+      const prefix = type === 'image' ? '📷 ' : '📎 ';
+      const content = `${prefix}${urlData.publicUrl}`;
+
+      await supabase.from('messages').insert({
+        sender_id: currentUser.id,
+        receiver_id: friend.id,
+        content,
+      });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    setNewMessage(prev => prev + emoji);
+  };
+
+  const isImageMessage = (content: string) => content.startsWith('📷 ');
+  const isFileMessage = (content: string) => content.startsWith('📎 ');
+  const getAttachmentUrl = (content: string) => content.substring(2).trim();
+
   const handleProfileClick = () => {
     navigate(`/profile/${friend.id}`);
   };
@@ -342,6 +388,10 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
         <div className="space-y-3">
           {messages.map((message) => {
             const isMine = message.sender_id === currentUser.id;
+            const isImage = isImageMessage(message.content);
+            const isFile = isFileMessage(message.content);
+            const attachmentUrl = (isImage || isFile) ? getAttachmentUrl(message.content) : '';
+            
             return (
               <div
                 key={message.id}
@@ -354,7 +404,16 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
                       : 'bg-muted rounded-bl-sm'
                   }`}
                 >
-                  <p className="text-sm">{message.content}</p>
+                  {isImage ? (
+                    <img src={attachmentUrl} alt="Shared image" className="rounded-lg max-w-full max-h-48 object-cover cursor-pointer" onClick={() => window.open(attachmentUrl, '_blank')} />
+                  ) : isFile ? (
+                    <a href={attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm underline">
+                      <Paperclip className="h-4 w-4" />
+                      Attachment
+                    </a>
+                  ) : (
+                    <p className="text-sm">{message.content}</p>
+                  )}
                   <div className={`flex items-center gap-1 mt-1 ${isMine ? 'justify-start' : 'justify-end'}`}>
                     <p className={`text-[10px] ${isMine ? 'opacity-70' : 'text-muted-foreground'}`}>
                       {formatDistanceToNow(new Date(message.created_at), { addSuffix: true, locale: ar })}
@@ -390,17 +449,41 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-3 border-t flex gap-2">
-        <Input
-          placeholder="اكتب رسالة..."
-          value={newMessage}
-          onChange={(e) => handleTyping(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-          className="bg-muted border-0"
-        />
-        <Button size="icon" onClick={handleSend} disabled={!newMessage.trim()}>
-          <Send className="h-4 w-4" />
-        </Button>
+      <div className="p-2 border-t">
+        <div className="flex items-center gap-1 mb-1">
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, 'image'); e.target.value = ''; }}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, 'file'); e.target.value = ''; }}
+          />
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => imageInputRef.current?.click()} disabled={uploadingFile}>
+            <ImageIcon className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={uploadingFile}>
+            <Paperclip className="h-4 w-4" />
+          </Button>
+          <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+        </div>
+        <div className="flex gap-2">
+          <Input
+            placeholder="اكتب رسالة..."
+            value={newMessage}
+            onChange={(e) => handleTyping(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            className="bg-muted border-0"
+          />
+          <Button size="icon" onClick={handleSend} disabled={!newMessage.trim() || uploadingFile}>
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Video Call Dialog */}

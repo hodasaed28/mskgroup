@@ -10,6 +10,9 @@ import GlobalChat from "@/components/layout/GlobalChat";
 import { IncomingCallListener } from "@/components/chat/IncomingCallListener";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import TwoFactorAuth from "./pages/TwoFactorAuth";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
 import Friends from "./pages/Friends";
 import Notifications from "./pages/Notifications";
@@ -55,6 +58,9 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/2fa" element={<TwoFactorAuth />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/profile/:id" element={<Profile />} />
                 <Route path="/friends" element={<Friends />} />
                 <Route path="/notifications" element={<Notifications />} />
