@@ -145,16 +145,54 @@ export default function ChatSidebar({
     fetchChats();
   };
 
-  const handleMuteChat = (friendId: string) => {
-    toast({ title: 'تم كتم المحادثة' });
+  const handleMuteChat = async (friendId: string) => {
+    if (!currentUser) return;
+
+    // Check if already muted
+    const { data: existing } = await supabase
+      .from('muted_users')
+      .select('id')
+      .eq('user_id', currentUser.id)
+      .eq('muted_user_id', friendId)
+      .single();
+
+    if (existing) {
+      // Unmute
+      await supabase.from('muted_users').delete().eq('id', existing.id);
+      toast({ title: 'تم إلغاء كتم المحادثة' });
+    } else {
+      // Mute
+      await supabase.from('muted_users').insert({
+        user_id: currentUser.id,
+        muted_user_id: friendId,
+        mute_posts: true,
+        mute_stories: true,
+      });
+      toast({ title: 'تم كتم المحادثة' });
+    }
   };
 
-  const handleArchiveChat = (friendId: string) => {
+  const handleArchiveChat = async (friendId: string) => {
+    // Mark all messages as read (archive behavior)
+    if (!currentUser) return;
+    await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('sender_id', friendId)
+      .eq('receiver_id', currentUser.id)
+      .eq('is_read', false);
     toast({ title: 'تم أرشفة المحادثة' });
+    fetchChats();
   };
 
   const handleBlockUser = async (friendId: string) => {
     if (!currentUser) return;
+
+    // Add to blocked users
+    await supabase.from('blocked_users').insert({
+      user_id: currentUser.id,
+      blocked_user_id: friendId,
+    });
 
     // Delete friendship
     await supabase

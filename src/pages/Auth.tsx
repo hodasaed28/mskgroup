@@ -317,11 +317,17 @@ export default function Auth() {
         .single();
 
       if (profile && (profile as any).two_factor_enabled) {
-        // Sign out temporarily and prompt for 2FA
+        // Sign out temporarily and redirect to 2FA page
         await supabase.auth.signOut();
-        setPending2FAUser({ id: data.user.id, email: data.user.email || loginForm.email });
-        setAuthStep('2fa');
         setIsLoading(false);
+        navigate('/2fa', {
+          state: {
+            userId: data.user.id,
+            userEmail: data.user.email || loginForm.email,
+            email: loginForm.email,
+            password: loginForm.password,
+          },
+        });
         return;
       }
     }
@@ -753,6 +759,18 @@ export default function Auth() {
                         ) : null}
                         {authMethod === 'phone' ? t('auth.verifyOtp') : t('auth.loginButton')}
                       </Button>
+                      {authMethod === 'email' && (
+                        <div className="text-center mt-2">
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="text-sm text-muted-foreground"
+                            onClick={() => navigate('/forgot-password')}
+                          >
+                            Forgot your password?
+                          </Button>
+                        </div>
+                      )}
                     </form>
                   </TabsContent>
                   
