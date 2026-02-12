@@ -625,6 +625,35 @@ export type Database = {
           },
         ]
       }
+      pinned_posts: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pinned_posts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_hashtags: {
         Row: {
           created_at: string
@@ -769,6 +798,7 @@ export type Database = {
           is_online: boolean | null
           is_private: boolean
           last_seen: string | null
+          link_url: string | null
           two_factor_backup_codes: Json | null
           two_factor_enabled: boolean | null
           two_factor_secret: string | null
@@ -785,6 +815,7 @@ export type Database = {
           is_online?: boolean | null
           is_private?: boolean
           last_seen?: string | null
+          link_url?: string | null
           two_factor_backup_codes?: Json | null
           two_factor_enabled?: boolean | null
           two_factor_secret?: string | null
@@ -801,6 +832,7 @@ export type Database = {
           is_online?: boolean | null
           is_private?: boolean
           last_seen?: string | null
+          link_url?: string | null
           two_factor_backup_codes?: Json | null
           two_factor_enabled?: boolean | null
           two_factor_secret?: string | null
@@ -1022,6 +1054,27 @@ export type Database = {
           },
         ]
       }
+      search_history: {
+        Row: {
+          created_at: string
+          id: string
+          query: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          query: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          query?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       stories: {
         Row: {
           caption: string | null
@@ -1236,6 +1289,7 @@ export type Database = {
           full_name: string | null
           id: string | null
           is_private: boolean | null
+          link_url: string | null
           updated_at: string | null
           username: string | null
         }
@@ -1247,6 +1301,7 @@ export type Database = {
           full_name?: string | null
           id?: string | null
           is_private?: boolean | null
+          link_url?: string | null
           updated_at?: string | null
           username?: string | null
         }
@@ -1258,6 +1313,7 @@ export type Database = {
           full_name?: string | null
           id?: string | null
           is_private?: boolean | null
+          link_url?: string | null
           updated_at?: string | null
           username?: string | null
         }

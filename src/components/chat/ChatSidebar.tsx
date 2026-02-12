@@ -10,12 +10,13 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { X, Search, MoreVertical, Trash2, VolumeX, Archive, UserX } from 'lucide-react';
+import { X, Search, MoreVertical, Trash2, VolumeX, Archive, UserX, Users, Plus } from 'lucide-react';
 import { Profile, Message } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { CreateGroupDialog } from '@/components/groups/CreateGroupDialog';
 
 interface ChatSidebarProps {
   isOpen: boolean;
@@ -40,6 +41,7 @@ export default function ChatSidebar({
 }: ChatSidebarProps) {
   const [chats, setChats] = useState<ChatPreview[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -215,9 +217,14 @@ export default function ChatSidebar({
     <div className="fixed left-0 top-14 bottom-0 w-80 bg-card border-l shadow-lg z-40 animate-slide-in" dir="rtl">
       <div className="flex items-center justify-between p-4 border-b">
         <h2 className="font-semibold text-lg">الرسائل</h2>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={() => setShowCreateGroup(true)} title="إنشاء مجموعة">
+            <Users className="h-5 w-5" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       <div className="p-3">
@@ -326,6 +333,15 @@ export default function ChatSidebar({
           )}
         </div>
       </ScrollArea>
+
+      {currentUser && (
+        <CreateGroupDialog
+          open={showCreateGroup}
+          onOpenChange={setShowCreateGroup}
+          currentUser={currentUser}
+          onGroupCreated={() => { setShowCreateGroup(false); toast({ title: 'تم إنشاء المجموعة بنجاح' }); }}
+        />
+      )}
     </div>
   );
 }

@@ -9,10 +9,12 @@ import { useChatContext } from '@/contexts/ChatContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, UserPlus, MessageCircle, Check, X, Loader2, UserMinus, Eye, Upload, PlayCircle, Bookmark, Users, Image as ImageIcon } from 'lucide-react';
+import { Camera, UserPlus, MessageCircle, Check, X, Loader2, UserMinus, Eye, Upload, PlayCircle, Bookmark, Users, Image as ImageIcon, Link as LinkIcon, Pin, PinOff, Globe, Edit3 } from 'lucide-react';
 import { OnlineIndicator } from '@/components/ui/online-indicator';
 
 export default function ProfilePage() {
@@ -21,7 +23,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const { profile: currentUserProfile, notificationCount, messageCount, toggleChat, selectChat } = useChatContext();
+  const { profile: currentUserProfile, notificationCount, messageCount, toggleChat, selectChat, updateOnlineStatus } = useChatContext();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
@@ -38,6 +40,10 @@ export default function ProfilePage() {
   const [hasStory, setHasStory] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [pinnedPostIds, setPinnedPostIds] = useState<Set<string>>(new Set());
+  const [editingLink, setEditingLink] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [activityStatusVisible, setActivityStatusVisible] = useState(true);
   
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +63,7 @@ export default function ProfilePage() {
       fetchFriends();
       checkFriendship();
       checkHasStory();
+      fetchPinnedPosts();
       if (isOwnProfile) {
         fetchSavedPosts();
       }
@@ -66,7 +73,6 @@ export default function ProfilePage() {
   const fetchProfile = async () => {
     if (!id) return;
     
-    // For own profile, fetch all fields; for others, exclude sensitive fields
     if (isOwnProfile) {
       const { data } = await supabase
         .from('profiles')
@@ -76,9 +82,10 @@ export default function ProfilePage() {
       
       if (data) {
         setProfile(data as unknown as Profile);
+        setLinkUrl((data as any).link_url || '');
+        setActivityStatusVisible((data as any).is_online !== false);
       }
     } else {
-      // Use the public view that excludes sensitive fields (is_online, last_seen, two_factor_enabled)
       const { data } = await supabase
         .from('profiles_public')
         .select('*')
@@ -94,7 +101,6 @@ export default function ProfilePage() {
 
   const fetchPosts = async () => {
     if (!id) return;
-
     const { data, count } = await supabase
       .from('posts')
       .select('*, profiles(*)', { count: 'exact' })
@@ -104,8 +110,6 @@ export default function ProfilePage() {
     if (data) {
       setPosts(data as unknown as Post[]);
       setPostCount(count || 0);
-      
-      // Extract photos from posts
       const postPhotos = data
         .filter((p: any) => p.image_url)
         .map((p: any) => p.image_url as string);
@@ -115,7 +119,6 @@ export default function ProfilePage() {
 
   const fetchFriends = async () => {
     if (!id) return;
-
     const { data, count } = await supabase
       .from('friendships')
       .select(`
@@ -141,36 +144,37 @@ export default function ProfilePage() {
 
   const fetchSavedPosts = async () => {
     if (!user) return;
-
     const { data } = await supabase
       .from('saved_posts')
-      .select(`
-        *,
-        post:posts(*, profiles(*))
-      `)
+      .select(`*, post:posts(*, profiles(*))`)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
+    if (data) setSavedPosts(data as unknown as SavedPost[]);
+  };
 
+  const fetchPinnedPosts = async () => {
+    if (!id) return;
+    const { data } = await supabase
+      .from('pinned_posts' as any)
+      .select('post_id')
+      .eq('user_id', id);
     if (data) {
-      setSavedPosts(data as unknown as SavedPost[]);
+      setPinnedPostIds(new Set((data as any[]).map(p => p.post_id)));
     }
   };
 
   const checkHasStory = async () => {
     if (!id) return;
-    
     const { count } = await supabase
       .from('stories')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', id)
       .gt('expires_at', new Date().toISOString());
-    
     setHasStory((count || 0) > 0);
   };
 
   const checkFriendship = async () => {
     if (!id || !user || id === user.id) return;
-
     const { data } = await supabase
       .from('friendships')
       .select('*')
@@ -179,15 +183,10 @@ export default function ProfilePage() {
 
     if (data) {
       setFriendshipId(data.id);
-      if (data.status === 'accepted') {
-        setFriendshipStatus('accepted');
-      } else if (data.status === 'rejected') {
-        setFriendshipStatus('none');
-      } else if (data.requester_id === user.id) {
-        setFriendshipStatus('pending');
-      } else {
-        setFriendshipStatus('received');
-      }
+      if (data.status === 'accepted') setFriendshipStatus('accepted');
+      else if (data.status === 'rejected') setFriendshipStatus('none');
+      else if (data.requester_id === user.id) setFriendshipStatus('pending');
+      else setFriendshipStatus('received');
     } else {
       setFriendshipStatus('none');
     }
@@ -195,20 +194,12 @@ export default function ProfilePage() {
 
   const sendFriendRequest = async () => {
     if (!user || !id || !currentUserProfile) return;
-
     if (friendshipId) {
-      await supabase
-        .from('friendships')
-        .delete()
-        .eq('id', friendshipId);
+      await supabase.from('friendships').delete().eq('id', friendshipId);
     }
-
     const { data, error } = await supabase
       .from('friendships')
-      .insert({
-        requester_id: user.id,
-        addressee_id: id,
-      })
+      .insert({ requester_id: user.id, addressee_id: id })
       .select()
       .single();
 
@@ -219,7 +210,6 @@ export default function ProfilePage() {
         p_content: `${currentUserProfile.full_name || currentUserProfile.username} أرسل لك طلب صداقة`,
         p_reference_id: data.id,
       });
-
       toast({ title: 'تم إرسال طلب الصداقة' });
       checkFriendship();
     }
@@ -227,12 +217,7 @@ export default function ProfilePage() {
 
   const removeFriend = async () => {
     if (!friendshipId) return;
-
-    const { error } = await supabase
-      .from('friendships')
-      .delete()
-      .eq('id', friendshipId);
-
+    const { error } = await supabase.from('friendships').delete().eq('id', friendshipId);
     if (!error) {
       toast({ title: 'تم إزالة الصديق' });
       setFriendshipStatus('none');
@@ -243,18 +228,8 @@ export default function ProfilePage() {
 
   const handleFriendRequest = async (accept: boolean) => {
     if (!friendshipId || !currentUserProfile) return;
-
-    const { data: friendship } = await supabase
-      .from('friendships')
-      .select('requester_id')
-      .eq('id', friendshipId)
-      .single();
-
-    const { error } = await supabase
-      .from('friendships')
-      .update({ status: accept ? 'accepted' : 'rejected' })
-      .eq('id', friendshipId);
-
+    const { data: friendship } = await supabase.from('friendships').select('requester_id').eq('id', friendshipId).single();
+    const { error } = await supabase.from('friendships').update({ status: accept ? 'accepted' : 'rejected' }).eq('id', friendshipId);
     if (!error && friendship) {
       await supabase.rpc('create_notification', {
         p_user_id: friendship.requester_id,
@@ -264,7 +239,6 @@ export default function ProfilePage() {
           : `${currentUserProfile.full_name || currentUserProfile.username} رفض طلب صداقتك`,
         p_reference_id: friendshipId,
       });
-
       toast({ title: accept ? 'تم قبول الطلب' : 'تم رفض الطلب' });
       checkFriendship();
       fetchFriends();
@@ -272,38 +246,21 @@ export default function ProfilePage() {
   };
 
   const handleMessage = () => {
-    if (profile) {
-      selectChat(profile);
-      toggleChat();
-    }
+    if (profile) { selectChat(profile); toggleChat(); }
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
-
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(fileName, file, { upsert: true });
-
+      const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file, { upsert: true });
       if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('media')
-        .getPublicUrl(fileName);
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: urlData.publicUrl })
-        .eq('id', user.id);
-
+      const { data: urlData } = supabase.storage.from('media').getPublicUrl(fileName);
+      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: urlData.publicUrl }).eq('id', user.id);
       if (updateError) throw updateError;
-
       toast({ title: 'تم تحديث الصورة الشخصية' });
       fetchProfile();
     } catch (error: any) {
@@ -317,29 +274,15 @@ export default function ProfilePage() {
   const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
-
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/cover-${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(fileName, file, { upsert: true });
-
+      const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file, { upsert: true });
       if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('media')
-        .getPublicUrl(fileName);
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ cover_url: urlData.publicUrl } as any)
-        .eq('id', user.id);
-
+      const { data: urlData } = supabase.storage.from('media').getPublicUrl(fileName);
+      const { error: updateError } = await supabase.from('profiles').update({ cover_url: urlData.publicUrl } as any).eq('id', user.id);
       if (updateError) throw updateError;
-
       toast({ title: 'تم تحديث صورة الغلاف' });
       fetchProfile();
     } catch (error: any) {
@@ -347,6 +290,34 @@ export default function ProfilePage() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleSaveLink = async () => {
+    if (!user) return;
+    await supabase.from('profiles').update({ link_url: linkUrl || null } as any).eq('id', user.id);
+    toast({ title: 'تم حفظ الرابط' });
+    setEditingLink(false);
+    fetchProfile();
+  };
+
+  const handleTogglePinPost = async (postId: string) => {
+    if (!user) return;
+    if (pinnedPostIds.has(postId)) {
+      await supabase.from('pinned_posts' as any).delete().eq('user_id', user.id).eq('post_id', postId);
+      toast({ title: 'تم إلغاء التثبيت' });
+    } else {
+      await supabase.from('pinned_posts' as any).insert({ user_id: user.id, post_id: postId } as any);
+      toast({ title: 'تم تثبيت المنشور' });
+    }
+    fetchPinnedPosts();
+  };
+
+  const handleToggleActivityStatus = async () => {
+    if (!user) return;
+    const newStatus = !activityStatusVisible;
+    setActivityStatusVisible(newStatus);
+    await supabase.from('profiles').update({ is_online: newStatus ? true : false } as any).eq('id', user.id);
+    toast({ title: newStatus ? 'حالة النشاط مرئية' : 'حالة النشاط مخفية' });
   };
 
   if (authLoading || loading) {
@@ -364,6 +335,15 @@ export default function ProfilePage() {
       </div>
     );
   }
+
+  // Sort posts: pinned first
+  const sortedPosts = [...posts].sort((a, b) => {
+    const aPinned = pinnedPostIds.has(a.id);
+    const bPinned = pinnedPostIds.has(b.id);
+    if (aPinned && !bPinned) return -1;
+    if (!aPinned && bPinned) return 1;
+    return 0;
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -383,20 +363,9 @@ export default function ProfilePage() {
         >
           {isOwnProfile && (
             <>
-              <input
-                ref={coverInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleCoverUpload}
-              />
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                className="absolute bottom-4 left-4"
-                onClick={(e) => { e.stopPropagation(); coverInputRef.current?.click(); }}
-                disabled={uploading}
-              >
+              <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
+              <Button variant="secondary" size="sm" className="absolute bottom-4 left-4"
+                onClick={(e) => { e.stopPropagation(); coverInputRef.current?.click(); }} disabled={uploading}>
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Camera className="h-4 w-4 ml-2" />}
                 تغيير الغلاف
               </Button>
@@ -407,21 +376,12 @@ export default function ProfilePage() {
         {/* Cover Full View */}
         <Dialog open={showCoverFullView} onOpenChange={setShowCoverFullView}>
           <DialogContent className="sm:max-w-4xl bg-black/90 border-0 p-0">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
-              onClick={() => setShowCoverFullView(false)}
-            >
+            <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white hover:bg-white/20 z-10" onClick={() => setShowCoverFullView(false)}>
               <X className="h-6 w-6" />
             </Button>
             <div className="flex items-center justify-center min-h-[60vh]">
               {(profile as any).cover_url && (
-                <img 
-                  src={(profile as any).cover_url} 
-                  alt="Cover"
-                  className="max-w-full max-h-[80vh] object-contain"
-                />
+                <img src={(profile as any).cover_url} alt="Cover" className="max-w-full max-h-[80vh] object-contain" />
               )}
             </div>
           </DialogContent>
@@ -433,9 +393,7 @@ export default function ProfilePage() {
             {/* Avatar with options */}
             <Dialog open={showAvatarOptions} onOpenChange={setShowAvatarOptions}>
               <DialogTrigger asChild>
-                <div 
-                  className={`relative cursor-pointer group ${hasStory ? 'ring-4 ring-primary ring-offset-2 ring-offset-background rounded-full' : ''}`}
-                >
+                <div className={`relative cursor-pointer group ${hasStory ? 'ring-4 ring-primary ring-offset-2 ring-offset-background rounded-full' : ''}`}>
                   <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-background">
                     <AvatarImage src={profile.avatar_url || ''} />
                     <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
@@ -444,19 +402,11 @@ export default function ProfilePage() {
                   </Avatar>
                   {!isOwnProfile && (
                     <div className="absolute bottom-4 right-0">
-                      <OnlineIndicator 
-                        isOnline={(profile as any).is_online} 
-                        showDot={true}
-                        className="w-4 h-4"
-                      />
+                      <OnlineIndicator isOnline={(profile as any).is_online} showDot={true} className="w-4 h-4" />
                     </div>
                   )}
                   {isOwnProfile && (
-                    <Button 
-                      variant="secondary" 
-                      size="icon" 
-                      className="absolute bottom-2 left-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
+                    <Button variant="secondary" size="icon" className="absolute bottom-2 left-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                       <Camera className="h-4 w-4" />
                     </Button>
                   )}
@@ -465,40 +415,24 @@ export default function ProfilePage() {
               <DialogContent className="sm:max-w-xs" dir="rtl">
                 <div className="flex flex-col gap-2 p-2">
                   {profile.avatar_url && (
-                    <Button 
-                      variant="ghost" 
-                      className="w-full justify-start gap-3"
-                      onClick={() => { setShowAvatarOptions(false); setShowAvatarFullView(true); }}
-                    >
+                    <Button variant="ghost" className="w-full justify-start gap-3"
+                      onClick={() => { setShowAvatarOptions(false); setShowAvatarFullView(true); }}>
                       <Eye className="h-5 w-5" />
                       عرض الصورة
                     </Button>
                   )}
                   {hasStory && (
-                    <Button 
-                      variant="ghost" 
-                      className="w-full justify-start gap-3"
-                      onClick={() => { setShowAvatarOptions(false); }}
-                    >
+                    <Button variant="ghost" className="w-full justify-start gap-3"
+                      onClick={() => { setShowAvatarOptions(false); }}>
                       <PlayCircle className="h-5 w-5" />
                       عرض القصة
                     </Button>
                   )}
                   {isOwnProfile && (
                     <>
-                      <input
-                        ref={avatarInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleAvatarUpload}
-                      />
-                      <Button 
-                        variant="ghost" 
-                        className="w-full justify-start gap-3"
-                        onClick={() => avatarInputRef.current?.click()}
-                        disabled={uploading}
-                      >
+                      <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+                      <Button variant="ghost" className="w-full justify-start gap-3"
+                        onClick={() => avatarInputRef.current?.click()} disabled={uploading}>
                         {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
                         تغيير الصورة
                       </Button>
@@ -511,26 +445,15 @@ export default function ProfilePage() {
             {/* Avatar Full View Dialog */}
             <Dialog open={showAvatarFullView} onOpenChange={setShowAvatarFullView}>
               <DialogContent className="sm:max-w-2xl bg-black/90 border-0 p-0">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
-                  onClick={() => setShowAvatarFullView(false)}
-                >
+                <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white hover:bg-white/20 z-10" onClick={() => setShowAvatarFullView(false)}>
                   <X className="h-6 w-6" />
                 </Button>
                 <div className="flex items-center justify-center min-h-[60vh]">
                   {profile.avatar_url ? (
-                    <img 
-                      src={profile.avatar_url} 
-                      alt={profile.full_name || profile.username}
-                      className="max-w-full max-h-[80vh] object-contain"
-                    />
+                    <img src={profile.avatar_url} alt={profile.full_name || profile.username} className="max-w-full max-h-[80vh] object-contain" />
                   ) : (
                     <div className="w-64 h-64 rounded-full bg-primary flex items-center justify-center">
-                      <span className="text-8xl text-primary-foreground font-bold">
-                        {profile.username.charAt(0).toUpperCase()}
-                      </span>
+                      <span className="text-8xl text-primary-foreground font-bold">{profile.username.charAt(0).toUpperCase()}</span>
                     </div>
                   )}
                 </div>
@@ -547,17 +470,34 @@ export default function ProfilePage() {
                   {profile.full_name || profile.username}
                 </h1>
                 {!isOwnProfile && (
-                  <OnlineIndicator 
-                    isOnline={(profile as any).is_online} 
-                    lastSeen={(profile as any).last_seen}
-                    showText={true}
-                  />
+                  <OnlineIndicator isOnline={(profile as any).is_online} lastSeen={(profile as any).last_seen} showText={true} />
                 )}
               </div>
               <p className="text-muted-foreground">@{profile.username}</p>
-              {profile.bio && (
-                <p className="mt-2 text-sm">{profile.bio}</p>
+              {profile.bio && <p className="mt-2 text-sm">{profile.bio}</p>}
+              
+              {/* Link in Bio */}
+              {(profile as any).link_url && !editingLink && (
+                <a href={(profile as any).link_url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 mt-1 text-sm text-primary hover:underline">
+                  <LinkIcon className="h-3.5 w-3.5" />
+                  {(profile as any).link_url.replace(/^https?:\/\//, '').slice(0, 40)}
+                </a>
               )}
+              {isOwnProfile && editingLink && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Input placeholder="https://example.com" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} className="h-8 text-sm" />
+                  <Button size="sm" onClick={handleSaveLink}>حفظ</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingLink(false)}>إلغاء</Button>
+                </div>
+              )}
+              {isOwnProfile && !editingLink && (
+                <Button variant="ghost" size="sm" className="mt-1 h-7 text-xs gap-1" onClick={() => setEditingLink(true)}>
+                  <Edit3 className="h-3 w-3" />
+                  {(profile as any).link_url ? 'تعديل الرابط' : 'إضافة رابط'}
+                </Button>
+              )}
+
               {/* Stats */}
               <div className="flex items-center gap-4 mt-3 text-sm">
                 <div className="flex items-center gap-1">
@@ -571,6 +511,14 @@ export default function ProfilePage() {
                   <span className="text-muted-foreground">منشور</span>
                 </div>
               </div>
+
+              {/* Activity Status Toggle (own profile only) */}
+              {isOwnProfile && (
+                <div className="flex items-center gap-2 mt-3">
+                  <Switch checked={activityStatusVisible} onCheckedChange={handleToggleActivityStatus} />
+                  <span className="text-sm text-muted-foreground">إظهار حالة النشاط</span>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2">
@@ -583,31 +531,25 @@ export default function ProfilePage() {
                     </Button>
                   )}
                   {friendshipStatus === 'pending' && (
-                    <Button variant="secondary" disabled>
-                      تم إرسال الطلب
-                    </Button>
+                    <Button variant="secondary" disabled>تم إرسال الطلب</Button>
                   )}
                   {friendshipStatus === 'received' && (
                     <div className="flex gap-2">
                       <Button onClick={() => handleFriendRequest(true)}>
-                        <Check className="h-4 w-4 ml-2" />
-                        قبول
+                        <Check className="h-4 w-4 ml-2" />قبول
                       </Button>
                       <Button variant="outline" onClick={() => handleFriendRequest(false)}>
-                        <X className="h-4 w-4 ml-2" />
-                        رفض
+                        <X className="h-4 w-4 ml-2" />رفض
                       </Button>
                     </div>
                   )}
                   {friendshipStatus === 'accepted' && (
                     <>
                       <Button variant="secondary" onClick={handleMessage}>
-                        <MessageCircle className="h-4 w-4 ml-2" />
-                        مراسلة
+                        <MessageCircle className="h-4 w-4 ml-2" />مراسلة
                       </Button>
                       <Button variant="outline" onClick={removeFriend}>
-                        <UserMinus className="h-4 w-4 ml-2" />
-                        إزالة صديق
+                        <UserMinus className="h-4 w-4 ml-2" />إزالة صديق
                       </Button>
                     </>
                   )}
@@ -632,18 +574,30 @@ export default function ProfilePage() {
             </TabsList>
 
             <TabsContent value="posts" className="mt-4 space-y-4">
-              {posts.length === 0 ? (
-                <Card className="p-8 text-center text-muted-foreground">
-                  لا توجد منشورات بعد
-                </Card>
+              {sortedPosts.length === 0 ? (
+                <Card className="p-8 text-center text-muted-foreground">لا توجد منشورات بعد</Card>
               ) : (
-                posts.map((post) => (
-                  <PostCard 
-                    key={post.id} 
-                    post={post} 
-                    currentUser={currentUserProfile}
-                    onDelete={fetchPosts}
-                  />
+                sortedPosts.map((post) => (
+                  <div key={post.id} className="relative">
+                    {pinnedPostIds.has(post.id) && (
+                      <div className="flex items-center gap-1 text-xs text-primary mb-1 px-2">
+                        <Pin className="h-3 w-3" />
+                        <span>منشور مثبت</span>
+                      </div>
+                    )}
+                    <PostCard post={post} currentUser={currentUserProfile} onDelete={fetchPosts} />
+                    {isOwnProfile && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 left-2 h-8 w-8"
+                        onClick={() => handleTogglePinPost(post.id)}
+                        title={pinnedPostIds.has(post.id) ? 'إلغاء التثبيت' : 'تثبيت المنشور'}
+                      >
+                        {pinnedPostIds.has(post.id) ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                      </Button>
+                    )}
+                  </div>
                 ))
               )}
             </TabsContent>
@@ -659,6 +613,14 @@ export default function ProfilePage() {
                   {profile.bio && (
                     <p><span className="text-muted-foreground">نبذة:</span> {profile.bio}</p>
                   )}
+                  {(profile as any).link_url && (
+                    <p>
+                      <span className="text-muted-foreground">الرابط:</span>{' '}
+                      <a href={(profile as any).link_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        {(profile as any).link_url}
+                      </a>
+                    </p>
+                  )}
                   <p>
                     <span className="text-muted-foreground">تاريخ الانضمام:</span>{' '}
                     {new Date(profile.created_at).toLocaleDateString('ar-EG')}
@@ -669,9 +631,7 @@ export default function ProfilePage() {
 
             <TabsContent value="friends" className="mt-4">
               {friends.length === 0 ? (
-                <Card className="p-8 text-center text-muted-foreground">
-                  لا يوجد أصدقاء بعد
-                </Card>
+                <Card className="p-8 text-center text-muted-foreground">لا يوجد أصدقاء بعد</Card>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {friends.map((friend) => (
@@ -690,12 +650,8 @@ export default function ProfilePage() {
                             )}
                           </div>
                           <div>
-                            <p className="font-semibold text-sm truncate max-w-full">
-                              {friend.full_name || friend.username}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              @{friend.username}
-                            </p>
+                            <p className="font-semibold text-sm truncate max-w-full">{friend.full_name || friend.username}</p>
+                            <p className="text-xs text-muted-foreground">@{friend.username}</p>
                           </div>
                         </div>
                       </Card>
@@ -707,46 +663,24 @@ export default function ProfilePage() {
 
             <TabsContent value="photos" className="mt-4">
               {photos.length === 0 ? (
-                <Card className="p-8 text-center text-muted-foreground">
-                  لا توجد صور بعد
-                </Card>
+                <Card className="p-8 text-center text-muted-foreground">لا توجد صور بعد</Card>
               ) : (
                 <>
                   <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
                     {photos.map((photo, index) => (
-                      <div 
-                        key={index}
-                        className="aspect-square cursor-pointer overflow-hidden rounded-lg hover:opacity-90 transition-opacity"
-                        onClick={() => setSelectedPhoto(photo)}
-                      >
-                        <img 
-                          src={photo} 
-                          alt={`Photo ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
+                      <div key={index} className="aspect-square cursor-pointer overflow-hidden rounded-lg hover:opacity-90 transition-opacity"
+                        onClick={() => setSelectedPhoto(photo)}>
+                        <img src={photo} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
                       </div>
                     ))}
                   </div>
-
-                  {/* Photo Viewer */}
                   <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
                     <DialogContent className="sm:max-w-4xl bg-black/90 border-0 p-0">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
-                        onClick={() => setSelectedPhoto(null)}
-                      >
+                      <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white hover:bg-white/20 z-10" onClick={() => setSelectedPhoto(null)}>
                         <X className="h-6 w-6" />
                       </Button>
                       <div className="flex items-center justify-center min-h-[60vh]">
-                        {selectedPhoto && (
-                          <img 
-                            src={selectedPhoto} 
-                            alt="Photo"
-                            className="max-w-full max-h-[80vh] object-contain"
-                          />
-                        )}
+                        {selectedPhoto && <img src={selectedPhoto} alt="Photo" className="max-w-full max-h-[80vh] object-contain" />}
                       </div>
                     </DialogContent>
                   </Dialog>
@@ -765,12 +699,7 @@ export default function ProfilePage() {
                 ) : (
                   savedPosts.map((saved) => (
                     saved.post && (
-                      <PostCard 
-                        key={saved.id} 
-                        post={saved.post as unknown as Post} 
-                        currentUser={currentUserProfile}
-                        onDelete={fetchSavedPosts}
-                      />
+                      <PostCard key={saved.id} post={saved.post as unknown as Post} currentUser={currentUserProfile} onDelete={fetchSavedPosts} />
                     )
                   ))
                 )}

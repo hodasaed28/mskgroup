@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Profile, Post } from '@/types/database';
@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/hooks/useLanguage';
-import { Search, UserPlus, Loader2, Users, FileText, Hash, Heart, MessageCircle } from 'lucide-react';
+import { Search, UserPlus, Loader2, Users, FileText, Hash, Heart, MessageCircle, Clock, X, TrendingUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface SearchResult {
@@ -35,47 +35,99 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'people');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
+    if (!authLoading && !user) navigate('/auth');
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
     const q = searchParams.get('q');
     const tab = searchParams.get('tab');
-    if (q) {
-      setQuery(q);
-      searchAll(q);
-    }
-    if (tab) {
-      setActiveTab(tab);
-    }
+    if (q) { setQuery(q); searchAll(q); }
+    if (tab) setActiveTab(tab);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (user) fetchRecentSearches();
+  }, [user]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+          inputRef.current && !inputRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const fetchRecentSearches = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('search_history' as any)
+      .select('query')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    if (data) {
+      const unique = [...new Set((data as any[]).map(d => d.query))];
+      setRecentSearches(unique.slice(0, 8));
+    }
+  };
+
+  const saveSearchQuery = async (q: string) => {
+    if (!user || !q.trim()) return;
+    await supabase.from('search_history' as any).insert({ user_id: user.id, query: q.trim() } as any);
+    fetchRecentSearches();
+  };
+
+  const deleteRecentSearch = async (q: string) => {
+    if (!user) return;
+    await supabase.from('search_history' as any).delete().eq('user_id', user.id).eq('query', q);
+    fetchRecentSearches();
+  };
+
+  const clearAllRecentSearches = async () => {
+    if (!user) return;
+    await supabase.from('search_history' as any).delete().eq('user_id', user.id);
+    setRecentSearches([]);
+  };
+
+  const fetchSuggestions = async (q: string) => {
+    if (!q.trim() || q.length < 2) { setSuggestions([]); return; }
+    const sanitized = q.replace(/[%_\\'"]/g, '').trim();
+    const { data: people } = await supabase
+      .from('profiles_public')
+      .select('username, full_name')
+      .or(`username.ilike.%${sanitized}%,full_name.ilike.%${sanitized}%`)
+      .limit(5);
+    const names = (people || []).map(p => (p as any).full_name || (p as any).username).filter(Boolean);
+    setSuggestions(names.slice(0, 5));
+  };
 
   const searchAll = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
       setResults({ people: [], posts: [], hashtags: [] });
       return;
     }
-
     const sanitizedQuery = searchQuery.replace(/[%_\\'"]/g, '').trim();
-    if (!sanitizedQuery) {
-      setResults({ people: [], posts: [], hashtags: [] });
-      return;
-    }
+    if (!sanitizedQuery) { setResults({ people: [], posts: [], hashtags: [] }); return; }
 
     setLoading(true);
 
-    // Search people - use public view to exclude sensitive fields
     const { data: peopleData } = await supabase
       .from('profiles_public')
       .select('*')
       .or(`username.ilike.%${sanitizedQuery}%,full_name.ilike.%${sanitizedQuery}%`)
       .limit(20);
 
-    // Search posts
     const { data: postsData } = await supabase
       .from('posts')
       .select('*, profiles(*)')
@@ -83,7 +135,6 @@ export default function SearchPage() {
       .order('created_at', { ascending: false })
       .limit(20);
 
-    // Search hashtags (handle gracefully if table doesn't exist yet)
     let hashtagsData: { name: string; post_count: number }[] = [];
     try {
       const { data } = await supabase
@@ -93,9 +144,7 @@ export default function SearchPage() {
         .order('post_count', { ascending: false })
         .limit(20);
       hashtagsData = (data as any) || [];
-    } catch {
-      // Table might not exist yet
-    }
+    } catch {}
 
     setResults({
       people: (peopleData?.filter(p => p.id !== user?.id) || []) as Profile[],
@@ -109,27 +158,35 @@ export default function SearchPage() {
     e.preventDefault();
     if (query.trim()) {
       setSearchParams({ q: query, tab: activeTab });
+      saveSearchQuery(query);
+      setShowDropdown(false);
     }
+  };
+
+  const handleSelectSuggestion = (q: string) => {
+    setQuery(q);
+    setSearchParams({ q, tab: activeTab });
+    saveSearchQuery(q);
+    setShowDropdown(false);
   };
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    if (query.trim()) {
-      setSearchParams({ q: query, tab });
-    }
+    if (query.trim()) setSearchParams({ q: query, tab });
+  };
+
+  const handleInputChange = (value: string) => {
+    setQuery(value);
+    setShowDropdown(true);
+    fetchSuggestions(value);
   };
 
   const sendFriendRequest = async (userId: string) => {
     if (!user || !profile) return;
-
     const { data, error } = await supabase
       .from('friendships')
-      .insert({
-        requester_id: user.id,
-        addressee_id: userId,
-      })
-      .select()
-      .single();
+      .insert({ requester_id: user.id, addressee_id: userId })
+      .select().single();
 
     if (!error && data) {
       await supabase.rpc('create_notification', {
@@ -138,7 +195,6 @@ export default function SearchPage() {
         p_content: `${profile.full_name || profile.username} sent you a friend request`,
         p_reference_id: data.id,
       });
-
       toast({ title: 'Friend request sent!' });
     } else if (error?.code === '23505') {
       toast({ title: 'Friend request already exists', variant: 'destructive' });
@@ -154,29 +210,68 @@ export default function SearchPage() {
   }
 
   const totalResults = results.people.length + results.posts.length + results.hashtags.length;
+  const hasQuery = !!searchParams.get('q');
 
   return (
     <div className="min-h-screen bg-background">
-      <Header 
-        profile={profile} 
-        notificationCount={notificationCount}
-        messageCount={messageCount}
-        onMessagesClick={toggleChat}
-      />
+      <Header profile={profile} notificationCount={notificationCount} messageCount={messageCount} onMessagesClick={toggleChat} />
 
       <div className="container mx-auto px-4 py-6 max-w-2xl" dir={isRTL ? 'rtl' : 'ltr'}>
         <h1 className="text-2xl font-bold mb-6">{t('nav.search').replace('...', '')}</h1>
 
-        <form onSubmit={handleSearch} className="mb-6">
+        <form onSubmit={handleSearch} className="mb-6 relative">
           <div className="relative">
             <Search className={`absolute top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground ${isRTL ? 'right-3' : 'left-3'}`} />
             <Input
+              ref={inputRef}
               placeholder={t('nav.search')}
               className={`h-12 text-lg ${isRTL ? 'pr-10' : 'pl-10'}`}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onFocus={() => setShowDropdown(true)}
             />
           </div>
+
+          {/* Dropdown: Recent searches + suggestions */}
+          {showDropdown && (recentSearches.length > 0 || suggestions.length > 0) && !hasQuery && (
+            <div ref={dropdownRef} className="absolute top-full left-0 right-0 z-50 mt-1 bg-card border rounded-lg shadow-lg overflow-hidden">
+              {suggestions.length > 0 && (
+                <div className="p-2 border-b">
+                  <p className="text-xs text-muted-foreground px-2 py-1 flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3" /> اقتراحات
+                  </p>
+                  {suggestions.map((s, i) => (
+                    <button key={i} onClick={() => handleSelectSuggestion(s)}
+                      className="w-full text-right px-3 py-2 hover:bg-muted rounded text-sm transition-colors">
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {recentSearches.length > 0 && (
+                <div className="p-2">
+                  <div className="flex items-center justify-between px-2 py-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> عمليات البحث الأخيرة
+                    </p>
+                    <button onClick={clearAllRecentSearches} className="text-xs text-destructive hover:underline">
+                      مسح الكل
+                    </button>
+                  </div>
+                  {recentSearches.map((s, i) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-2 hover:bg-muted rounded transition-colors">
+                      <button onClick={() => handleSelectSuggestion(s)} className="flex-1 text-right text-sm">
+                        {s}
+                      </button>
+                      <button onClick={() => deleteRecentSearch(s)} className="text-muted-foreground hover:text-destructive p-1">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </form>
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -199,7 +294,7 @@ export default function SearchPage() {
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          ) : totalResults === 0 && searchParams.get('q') ? (
+          ) : totalResults === 0 && hasQuery ? (
             <Card className="p-8 text-center text-muted-foreground">
               <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No results for "{searchParams.get('q')}"</p>
@@ -223,9 +318,7 @@ export default function SearchPage() {
                           {person.full_name || person.username}
                         </Link>
                         <p className="text-sm text-muted-foreground">@{person.username}</p>
-                        {person.bio && (
-                          <p className="text-sm text-muted-foreground truncate mt-1">{person.bio}</p>
-                        )}
+                        {person.bio && <p className="text-sm text-muted-foreground truncate mt-1">{person.bio}</p>}
                       </div>
                       <Button size="sm" onClick={() => sendFriendRequest(person.id)}>
                         <UserPlus className="h-4 w-4" />
@@ -233,7 +326,7 @@ export default function SearchPage() {
                     </div>
                   </Card>
                 ))}
-                {results.people.length === 0 && searchParams.get('q') && (
+                {results.people.length === 0 && hasQuery && (
                   <p className="text-center text-muted-foreground py-8">No people found</p>
                 )}
               </TabsContent>
@@ -273,7 +366,7 @@ export default function SearchPage() {
                     </Card>
                   </Link>
                 ))}
-                {results.posts.length === 0 && searchParams.get('q') && (
+                {results.posts.length === 0 && hasQuery && (
                   <p className="text-center text-muted-foreground py-8">No posts found</p>
                 )}
               </TabsContent>
@@ -289,13 +382,13 @@ export default function SearchPage() {
                         <p className="font-semibold text-primary">#{hashtag.name}</p>
                         <p className="text-sm text-muted-foreground">{hashtag.post_count} posts</p>
                       </div>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => handleSelectSuggestion(`#${hashtag.name}`)}>
                         View
                       </Button>
                     </div>
                   </Card>
                 ))}
-                {results.hashtags.length === 0 && searchParams.get('q') && (
+                {results.hashtags.length === 0 && hasQuery && (
                   <p className="text-center text-muted-foreground py-8">No hashtags found</p>
                 )}
               </TabsContent>
