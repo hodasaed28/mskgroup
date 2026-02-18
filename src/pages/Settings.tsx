@@ -160,7 +160,7 @@ export default function SettingsPage() {
     try {
       // Fetch user's data from all tables
       const [profileRes, postsRes, commentsRes, friendsRes, messagesRes, notificationsRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('profiles').select('id, username, full_name, avatar_url, cover_url, bio, is_private, is_online, last_seen, link_url, created_at, updated_at').eq('id', user.id).single(),
         supabase.from('posts').select('*').eq('user_id', user.id),
         supabase.from('comments').select('*').eq('user_id', user.id),
         supabase.from('friendships').select('*').or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`),
@@ -206,7 +206,7 @@ export default function SettingsPage() {
 
     const { data } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, username, full_name, avatar_url, cover_url, bio, is_private, is_online, last_seen, link_url, two_factor_enabled, created_at, updated_at')
       .eq('id', user.id)
       .single();
 
