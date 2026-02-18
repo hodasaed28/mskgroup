@@ -1340,10 +1340,6 @@ export type Database = {
         Args: { p_backup_codes: Json; p_secret: string }
         Returns: boolean
       }
-      verify_two_factor_code: {
-        Args: { p_code: string; p_user_id: string }
-        Returns: Json
-      }
     }
     Enums: {
       [_ in never]: never
