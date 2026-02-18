@@ -151,53 +151,21 @@ export function TwoFactorSetup({ userId, userEmail, isEnabled, onStatusChange }:
 
     setLoading(true);
     try {
-      // Get the secret from server for verification
-      const { data: verifyData, error: verifyError } = await supabase.rpc('verify_two_factor_code', {
-        p_user_id: userId,
-        p_code: verificationCode,
+      // Verify code server-side using the secure edge function
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-2fa', {
+        body: { user_id: userId, code: verificationCode, email: userEmail },
       });
 
       if (verifyError) throw verifyError;
 
-      // Type assertion for the RPC response
-      const response = verifyData as { valid: boolean; error?: string; secret?: string; backup_codes?: string[] | string } | null;
-
-      if (!response?.valid) {
+      if (!verifyData?.valid) {
         toast({
           title: t('common.error'),
-          description: response?.error || '2FA not enabled',
+          description: 'Invalid verification code.',
           variant: 'destructive',
         });
         setLoading(false);
         return;
-      }
-
-      // Verify the code
-      const totp = new OTPAuth.TOTP({
-        issuer: 'MSK Group',
-        label: userEmail,
-        algorithm: 'SHA1',
-        digits: 6,
-        period: 30,
-        secret: OTPAuth.Secret.fromBase32(response.secret || ''),
-      });
-
-      const isValid = totp.validate({ token: verificationCode, window: 1 }) !== null;
-
-      if (!isValid) {
-        // Check backup codes
-        const storedBackupCodes: string[] = response.backup_codes ? 
-          (typeof response.backup_codes === 'string' ? JSON.parse(response.backup_codes) : response.backup_codes) : [];
-        
-        if (!storedBackupCodes.some(code => code.toUpperCase() === verificationCode.toUpperCase())) {
-          toast({
-            title: t('common.error'),
-            description: 'Invalid verification code.',
-            variant: 'destructive',
-          });
-          setLoading(false);
-          return;
-        }
       }
 
       // Disable 2FA using secure RPC function (clears server-side storage)
