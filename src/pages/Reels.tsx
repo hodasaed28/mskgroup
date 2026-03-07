@@ -1,34 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Reel } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
-import Header from '@/components/layout/Header';
 import { useChatContext } from '@/contexts/ChatContext';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Heart, MessageCircle, Share2, Volume2, VolumeX, Plus, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { Link } from 'react-router-dom';
+import { Plus, Loader2, ChevronUp, ChevronDown, Film } from 'lucide-react';
+import { ReelCard } from '@/components/reels/ReelCard';
 import { ReelCommentsSheet } from '@/components/reels/ReelCommentsSheet';
 import { ShareReelDialog } from '@/components/reels/ShareReelDialog';
+import { UploadReelDialog } from '@/components/reels/UploadReelDialog';
 
 export default function ReelsPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { toast } = useToast();
 
-  const { profile, notificationCount, messageCount, toggleChat } = useChatContext();
+  const { profile } = useChatContext();
   const [reels, setReels] = useState<Reel[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -36,50 +24,30 @@ export default function ReelsPage() {
   const [likes, setLikes] = useState<{ [key: string]: number }>({});
   const [likedReels, setLikedReels] = useState<Set<string>>(new Set());
   const [commentCounts, setCommentCounts] = useState<{ [key: string]: number }>({});
-  const [isUploading, setIsUploading] = useState(false);
-  const [caption, setCaption] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [selectedReelId, setSelectedReelId] = useState<string | null>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const videoRefs = useRef<{ [key: number]: HTMLVideoElement }>({});
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef(0);
+  const isTransitioning = useRef(false);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
+    if (!authLoading && !user) navigate('/auth');
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (user) {
-      fetchReels();
-    }
+    if (user) fetchReels();
   }, [user]);
 
   useEffect(() => {
-    // Navigate to specific reel if ID is in URL
     const reelId = searchParams.get('id');
     if (reelId && reels.length > 0) {
       const index = reels.findIndex(r => r.id === reelId);
-      if (index !== -1) {
-        setCurrentIndex(index);
-      }
+      if (index !== -1) setCurrentIndex(index);
     }
   }, [searchParams, reels]);
-
-  useEffect(() => {
-    // Auto-play current video
-    Object.entries(videoRefs.current).forEach(([index, video]) => {
-      if (parseInt(index) === currentIndex) {
-        video.play().catch(() => {});
-      } else {
-        video.pause();
-        video.currentTime = 0;
-      }
-    });
-  }, [currentIndex, reels]);
 
   const fetchReels = async () => {
     const { data } = await supabase
@@ -89,35 +57,27 @@ export default function ReelsPage() {
 
     if (data) {
       setReels(data as unknown as Reel[]);
-      // Fetch likes for all reels
       const reelIds = data.map(r => r.id);
-      const { data: likesData } = await supabase
-        .from('reels_likes')
-        .select('reel_id, user_id')
-        .in('reel_id', reelIds);
 
-      if (likesData) {
+      const [likesRes, commentsRes] = await Promise.all([
+        supabase.from('reels_likes').select('reel_id, user_id').in('reel_id', reelIds),
+        supabase.from('reel_comments').select('reel_id').in('reel_id', reelIds),
+      ]);
+
+      if (likesRes.data) {
         const likeCounts: { [key: string]: number } = {};
         const userLikes = new Set<string>();
-        likesData.forEach(like => {
+        likesRes.data.forEach(like => {
           likeCounts[like.reel_id] = (likeCounts[like.reel_id] || 0) + 1;
-          if (like.user_id === user?.id) {
-            userLikes.add(like.reel_id);
-          }
+          if (like.user_id === user?.id) userLikes.add(like.reel_id);
         });
         setLikes(likeCounts);
         setLikedReels(userLikes);
       }
 
-      // Fetch comment counts
-      const { data: commentsData } = await supabase
-        .from('reel_comments')
-        .select('reel_id')
-        .in('reel_id', reelIds);
-
-      if (commentsData) {
+      if (commentsRes.data) {
         const counts: { [key: string]: number } = {};
-        commentsData.forEach(c => {
+        commentsRes.data.forEach(c => {
           counts[c.reel_id] = (counts[c.reel_id] || 0) + 1;
         });
         setCommentCounts(counts);
@@ -126,324 +86,209 @@ export default function ReelsPage() {
     setLoading(false);
   };
 
+  const goTo = useCallback((direction: 'up' | 'down') => {
+    if (isTransitioning.current) return;
+    if (direction === 'down' && currentIndex < reels.length - 1) {
+      isTransitioning.current = true;
+      setCurrentIndex(i => i + 1);
+      setTimeout(() => { isTransitioning.current = false; }, 400);
+    } else if (direction === 'up' && currentIndex > 0) {
+      isTransitioning.current = true;
+      setCurrentIndex(i => i - 1);
+      setTimeout(() => { isTransitioning.current = false; }, 400);
+    }
+  }, [currentIndex, reels.length]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'j') goTo('down');
+      if (e.key === 'ArrowUp' || e.key === 'k') goTo('up');
+      if (e.key === 'm') setMuted(m => !m);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [goTo]);
+
+  // Wheel navigation
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      if (e.deltaY > 30) goTo('down');
+      else if (e.deltaY < -30) goTo('up');
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, [goTo]);
+
+  // Touch swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const delta = touchStartY.current - e.changedTouches[0].clientY;
+    if (Math.abs(delta) > 60) {
+      goTo(delta > 0 ? 'down' : 'up');
+    }
+  };
+
   const handleLike = async (reelId: string) => {
     if (!user) return;
-
     if (likedReels.has(reelId)) {
-      await supabase
-        .from('reels_likes')
-        .delete()
-        .eq('reel_id', reelId)
-        .eq('user_id', user.id);
-      
-      setLikedReels(prev => {
-        const next = new Set(prev);
-        next.delete(reelId);
-        return next;
-      });
+      await supabase.from('reels_likes').delete().eq('reel_id', reelId).eq('user_id', user.id);
+      setLikedReels(prev => { const n = new Set(prev); n.delete(reelId); return n; });
       setLikes(prev => ({ ...prev, [reelId]: (prev[reelId] || 1) - 1 }));
     } else {
-      await supabase
-        .from('reels_likes')
-        .insert({ reel_id: reelId, user_id: user.id });
-      
+      await supabase.from('reels_likes').insert({ reel_id: reelId, user_id: user.id });
       setLikedReels(prev => new Set(prev).add(reelId));
       setLikes(prev => ({ ...prev, [reelId]: (prev[reelId] || 0) + 1 }));
     }
   };
 
-  const handleOpenComments = (reelId: string) => {
-    setSelectedReelId(reelId);
-    setCommentsOpen(true);
-  };
-
-  const handleOpenShare = (reelId: string) => {
-    setSelectedReelId(reelId);
-    setShareOpen(true);
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 100 * 1024 * 1024) {
-        toast({
-          title: 'خطأ',
-          description: 'حجم الفيديو يجب أن يكون أقل من 100 ميجابايت',
-          variant: 'destructive',
-        });
-        return;
-      }
-      setSelectedFile(file);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!selectedFile || !profile) return;
-
-    setIsUploading(true);
-    try {
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
-      const filePath = `reels/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(filePath, selectedFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('media')
-        .getPublicUrl(filePath);
-
-      const { error: insertError } = await supabase
-        .from('reels')
-        .insert({
-          user_id: profile.id,
-          video_url: publicUrl,
-          caption: caption.trim() || null,
-        });
-
-      if (insertError) throw insertError;
-
-      toast({ title: 'تم نشر الريل بنجاح!' });
-      setDialogOpen(false);
-      setSelectedFile(null);
-      setCaption('');
-      fetchReels();
-    } catch (error: any) {
-      toast({
-        title: 'خطأ',
-        description: error.message || 'فشل في نشر الريل',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const goToNext = () => {
-    if (currentIndex < reels.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    }
-  };
-
-  const goToPrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-    }
-  };
-
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="fixed inset-0 flex items-center justify-center bg-black">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header
-        profile={profile}
-        notificationCount={notificationCount}
-        messageCount={messageCount}
-        onMessagesClick={toggleChat}
-      />
-
-      <div className="flex justify-center items-center py-4" dir="rtl">
-        <div className="relative w-full max-w-md h-[calc(100vh-120px)]">
-          {/* Upload Button */}
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                className="absolute top-4 left-4 z-20 rounded-full"
-                size="icon"
-              >
-                <Plus className="h-5 w-5" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent dir="rtl">
-              <DialogHeader>
-                <DialogTitle>نشر ريل جديد</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <input
-                  ref={videoInputRef}
-                  type="file"
-                  accept="video/*"
-                  className="hidden"
-                  onChange={handleFileSelect}
-                />
-                {selectedFile ? (
-                  <div className="space-y-2">
-                    <video
-                      src={URL.createObjectURL(selectedFile)}
-                      className="w-full h-48 object-cover rounded-lg"
-                      controls
-                    />
-                    <p className="text-sm text-muted-foreground">{selectedFile.name}</p>
-                  </div>
-                ) : (
-                  <Button
-                    variant="outline"
-                    className="w-full h-32"
-                    onClick={() => videoInputRef.current?.click()}
+    <div className="fixed inset-0 bg-black overflow-hidden" dir="rtl">
+      <div
+        ref={containerRef}
+        className="relative w-full h-full"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {reels.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center gap-4">
+            <Film className="h-16 w-16 text-white/30" />
+            <p className="text-white/50 text-lg">لا توجد ريلز بعد</p>
+            <Button
+              variant="outline"
+              className="border-white/20 text-white hover:bg-white/10"
+              onClick={() => setDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4 ml-2" />
+              أنشئ أول ريل
+            </Button>
+          </div>
+        ) : (
+          <>
+            {/* Reels stack with slide animation */}
+            <div className="relative w-full h-full max-w-lg mx-auto">
+              {reels.map((reel, index) => {
+                const offset = index - currentIndex;
+                return (
+                  <div
+                    key={reel.id}
+                    className="absolute inset-0 transition-all duration-400 ease-out"
+                    style={{
+                      transform: `translateY(${offset * 100}%)`,
+                      opacity: Math.abs(offset) <= 1 ? 1 : 0,
+                      pointerEvents: offset === 0 ? 'auto' : 'none',
+                    }}
                   >
-                    اختر فيديو
-                  </Button>
-                )}
-                <Textarea
-                  placeholder="اكتب وصفاً للريل..."
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                />
-                <Button
-                  className="w-full"
-                  onClick={handleUpload}
-                  disabled={!selectedFile || isUploading}
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                      جارٍ الرفع...
-                    </>
-                  ) : (
-                    'نشر'
-                  )}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {reels.length === 0 ? (
-            <Card className="h-full flex items-center justify-center">
-              <p className="text-muted-foreground">لا توجد ريلز بعد</p>
-            </Card>
-          ) : (
-            <div className="relative h-full">
-              {/* Navigation Arrows */}
-              <div className="absolute left-1/2 -translate-x-1/2 top-4 z-10 flex flex-col gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="bg-black/20 text-white hover:bg-black/40 rounded-full"
-                  onClick={goToPrevious}
-                  disabled={currentIndex === 0}
-                >
-                  <ChevronUp className="h-6 w-6" />
-                </Button>
-              </div>
-              <div className="absolute left-1/2 -translate-x-1/2 bottom-4 z-10">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="bg-black/20 text-white hover:bg-black/40 rounded-full"
-                  onClick={goToNext}
-                  disabled={currentIndex === reels.length - 1}
-                >
-                  <ChevronDown className="h-6 w-6" />
-                </Button>
-              </div>
-
-              {reels.map((reel, index) => (
-                <div
-                  key={reel.id}
-                  className={`absolute inset-0 transition-opacity duration-300 ${
-                    index === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
-                  }`}
-                >
-                  <div className="relative h-full rounded-2xl overflow-hidden bg-black">
-                    <video
-                      ref={(el) => { if (el) videoRefs.current[index] = el; }}
-                      src={reel.video_url}
-                      className="w-full h-full object-cover"
-                      loop
+                    <ReelCard
+                      reel={reel}
+                      isActive={index === currentIndex}
                       muted={muted}
-                      playsInline
-                      onClick={() => {
-                        const video = videoRefs.current[index];
-                        if (video.paused) video.play();
-                        else video.pause();
-                      }}
+                      onToggleMute={() => setMuted(m => !m)}
+                      liked={likedReels.has(reel.id)}
+                      likeCount={likes[reel.id] || 0}
+                      commentCount={commentCounts[reel.id] || 0}
+                      onLike={() => handleLike(reel.id)}
+                      onComment={() => { setSelectedReelId(reel.id); setCommentsOpen(true); }}
+                      onShare={() => { setSelectedReelId(reel.id); setShareOpen(true); }}
                     />
-
-                    {/* Controls Overlay */}
-                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-                      <div className="flex items-end justify-between">
-                        <div className="text-white space-y-2">
-                          <Link to={`/profile/${reel.user_id}`} className="flex items-center gap-2">
-                            <Avatar className="h-10 w-10 border-2 border-white">
-                              <AvatarImage src={reel.profiles?.avatar_url || ''} />
-                              <AvatarFallback>
-                                {reel.profiles?.username?.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="font-semibold">
-                              {reel.profiles?.full_name || reel.profiles?.username}
-                            </span>
-                          </Link>
-                          {reel.caption && (
-                            <p className="text-sm max-w-[200px]">{reel.caption}</p>
-                          )}
-                        </div>
-
-                        <div className="flex flex-col items-center gap-4">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-white hover:bg-white/20 rounded-full"
-                            onClick={() => handleLike(reel.id)}
-                          >
-                            <Heart
-                              className={`h-7 w-7 ${likedReels.has(reel.id) ? 'fill-red-500 text-red-500' : ''}`}
-                            />
-                          </Button>
-                          <span className="text-white text-sm">{likes[reel.id] || 0}</span>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-white hover:bg-white/20 rounded-full"
-                            onClick={() => handleOpenComments(reel.id)}
-                          >
-                            <MessageCircle className="h-7 w-7" />
-                          </Button>
-                          <span className="text-white text-sm">{commentCounts[reel.id] || 0}</span>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-white hover:bg-white/20 rounded-full"
-                            onClick={() => handleOpenShare(reel.id)}
-                          >
-                            <Share2 className="h-7 w-7" />
-                          </Button>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-white hover:bg-white/20 rounded-full"
-                            onClick={() => setMuted(!muted)}
-                          >
-                            {muted ? (
-                              <VolumeX className="h-7 w-7" />
-                            ) : (
-                              <Volume2 className="h-7 w-7" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          )}
-        </div>
+
+            {/* Navigation buttons - desktop */}
+            <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex-col gap-3 z-30" style={{ marginLeft: 'min(280px, 40vw)' }}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-12 w-12 rounded-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 transition-all disabled:opacity-30"
+                onClick={() => goTo('up')}
+                disabled={currentIndex === 0}
+              >
+                <ChevronUp className="h-6 w-6" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-12 w-12 rounded-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 transition-all disabled:opacity-30"
+                onClick={() => goTo('down')}
+                disabled={currentIndex === reels.length - 1}
+              >
+                <ChevronDown className="h-6 w-6" />
+              </Button>
+            </div>
+
+            {/* Reel counter */}
+            <div className="absolute top-5 left-1/2 -translate-x-1/2 z-30">
+              <div className="bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10">
+                <span className="text-white/80 text-sm font-medium">
+                  {currentIndex + 1} / {reels.length}
+                </span>
+              </div>
+            </div>
+
+            {/* Dot indicators (right side, vertical) */}
+            {reels.length > 1 && reels.length <= 20 && (
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-1.5">
+                {reels.map((_, i) => (
+                  <button
+                    key={i}
+                    className={`rounded-full transition-all duration-300 ${
+                      i === currentIndex
+                        ? 'w-2 h-4 bg-white'
+                        : 'w-2 h-2 bg-white/30 hover:bg-white/50'
+                    }`}
+                    onClick={() => setCurrentIndex(i)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Upload FAB */}
+        <Button
+          className="absolute bottom-6 right-6 z-30 h-14 w-14 rounded-full shadow-2xl bg-primary hover:bg-primary/90 transition-all hover:scale-105"
+          size="icon"
+          onClick={() => setDialogOpen(true)}
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+
+        {/* Back button */}
+        <Button
+          variant="ghost"
+          className="absolute top-5 right-5 z-30 text-white hover:bg-white/10 rounded-full"
+          onClick={() => navigate('/')}
+        >
+          الرئيسية
+        </Button>
       </div>
 
-      {/* Comments Sheet */}
+      {/* Upload dialog */}
+      {profile && (
+        <UploadReelDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          profileId={profile.id}
+          onUploaded={fetchReels}
+        />
+      )}
+
+      {/* Comments */}
       {selectedReelId && (
         <ReelCommentsSheet
           open={commentsOpen}
@@ -453,7 +298,7 @@ export default function ReelsPage() {
         />
       )}
 
-      {/* Share Dialog */}
+      {/* Share */}
       {selectedReelId && (
         <ShareReelDialog
           open={shareOpen}
