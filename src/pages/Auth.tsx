@@ -404,7 +404,7 @@ export default function Auth() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="signup-confirm">{t('auth.confirmPassword')}</Label>
-                          <PasswordInput id="signup-confirm" className="h-11 rounded-xl" value={signUpForm.confirmPassword} onChange={(e) => setSignUpForm({...signUpForm, confirmPassword: e.target.value})} required />
+                          <PasswordInput id="signup-confirm" className="h-11 rounded-xl" value={signUpForm.confirmPassword} onChange={(v) => setSignUpForm({...signUpForm, confirmPassword: v})} />
                         </div>
                       </>
                     ) : (
