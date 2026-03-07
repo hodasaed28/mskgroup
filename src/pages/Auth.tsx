@@ -358,7 +358,7 @@ export default function Auth() {
                             <Label htmlFor="login-password">{t('auth.password')}</Label>
                             <a href="/forgot-password" className="text-xs text-primary hover:underline">{t('auth.forgotPassword')}</a>
                           </div>
-                          <PasswordInput id="login-password" className="h-11 rounded-xl" value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} required />
+                          <PasswordInput id="login-password" className="h-11 rounded-xl" value={loginForm.password} onChange={(v) => setLoginForm({...loginForm, password: v})} />
                         </div>
                       </>
                     ) : (
