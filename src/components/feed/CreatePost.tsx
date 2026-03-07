@@ -4,11 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Image, Video, Send, X, Globe, Users, Lock, Loader2 } from 'lucide-react';
 import { Profile } from '@/types/database';
@@ -45,159 +41,76 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
       const end = textarea.selectionEnd;
       const newContent = content.slice(0, start) + emoji + content.slice(end);
       setContent(newContent);
-      // Set cursor position after emoji
-      setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
-        textarea.focus();
-      }, 0);
-    } else {
-      setContent(content + emoji);
-    }
+      setTimeout(() => { textarea.selectionStart = textarea.selectionEnd = start + emoji.length; textarea.focus(); }, 0);
+    } else { setContent(content + emoji); }
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast({
-          title: t('common.error'),
-          description: 'Image must be less than 10MB',
-          variant: 'destructive',
-        });
-        return;
-      }
-      setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
-      setVideoFile(null);
-      setVideoPreview(null);
+      if (file.size > 10 * 1024 * 1024) { toast({ title: t('common.error'), description: 'Image must be less than 10MB', variant: 'destructive' }); return; }
+      setImageFile(file); setImagePreview(URL.createObjectURL(file)); setVideoFile(null); setVideoPreview(null);
     }
   };
 
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 50 * 1024 * 1024) {
-        toast({
-          title: t('common.error'),
-          description: 'Video must be less than 50MB',
-          variant: 'destructive',
-        });
-        return;
-      }
-      setVideoFile(file);
-      setVideoPreview(URL.createObjectURL(file));
-      setImageFile(null);
-      setImagePreview(null);
+      if (file.size > 50 * 1024 * 1024) { toast({ title: t('common.error'), description: 'Video must be less than 50MB', variant: 'destructive' }); return; }
+      setVideoFile(file); setVideoPreview(URL.createObjectURL(file)); setImageFile(null); setImagePreview(null);
     }
   };
 
   const clearMedia = () => {
-    setImageFile(null);
-    setVideoFile(null);
-    setImagePreview(null);
-    setVideoPreview(null);
+    setImageFile(null); setVideoFile(null); setImagePreview(null); setVideoPreview(null);
     if (imageInputRef.current) imageInputRef.current.value = '';
     if (videoInputRef.current) videoInputRef.current.value = '';
   };
 
   const uploadFile = async (file: File, type: 'image' | 'video', postVisibility: string) => {
     if (!profile) return null;
-
     const fileExt = file.name.split('.').pop();
     const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
     const filePath = `${type}s/${fileName}`;
-    
-    // Use private bucket for friends-only or private posts
     const bucketName = postVisibility === 'everyone' ? 'media' : 'media-private';
-
-    const { error } = await supabase.storage
-      .from(bucketName)
-      .upload(filePath, file);
-
-    if (error) {
-      console.error('Upload error:', error);
-      return null;
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from(bucketName)
-      .getPublicUrl(filePath);
-
+    const { error } = await supabase.storage.from(bucketName).upload(filePath, file);
+    if (error) { console.error('Upload error:', error); return null; }
+    const { data: { publicUrl } } = supabase.storage.from(bucketName).getPublicUrl(filePath);
     return publicUrl;
   };
 
   const handleSubmit = async () => {
     if ((!content.trim() && !imageFile && !videoFile) || !profile) return;
-
     setIsLoading(true);
-
     let imageUrl: string | null = null;
     let videoUrl: string | null = null;
-
     try {
-      if (imageFile) {
-        imageUrl = await uploadFile(imageFile, 'image', visibility);
-        if (!imageUrl) {
-          throw new Error('Failed to upload image');
-        }
-      }
-
-      if (videoFile) {
-        videoUrl = await uploadFile(videoFile, 'video', visibility);
-        if (!videoUrl) {
-          throw new Error('Failed to upload video');
-        }
-      }
-
-      const { error } = await supabase
-        .from('posts')
-        .insert({
-          user_id: profile.id,
-          content: content.trim() || null,
-          image_url: imageUrl,
-          video_url: videoUrl,
-          visibility,
-        });
-
+      if (imageFile) { imageUrl = await uploadFile(imageFile, 'image', visibility); if (!imageUrl) throw new Error('Failed to upload image'); }
+      if (videoFile) { videoUrl = await uploadFile(videoFile, 'video', visibility); if (!videoUrl) throw new Error('Failed to upload video'); }
+      const { error } = await supabase.from('posts').insert({ user_id: profile.id, content: content.trim() || null, image_url: imageUrl, video_url: videoUrl, visibility });
       if (error) throw error;
-
-      setContent('');
-      clearMedia();
-      setVisibility('everyone');
-      onPostCreated();
-      toast({
-        title: t('common.success'),
-        description: 'Post published successfully',
-      });
+      setContent(''); clearMedia(); setVisibility('everyone'); onPostCreated();
+      toast({ title: t('common.success'), description: 'Post published successfully' });
     } catch (error: any) {
-      toast({
-        title: t('common.error'),
-        description: error.message || 'Failed to publish post',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
+      toast({ title: t('common.error'), description: error.message || 'Failed to publish post', variant: 'destructive' });
+    } finally { setIsLoading(false); }
   };
 
   const getVisibilityIcon = () => {
     switch (visibility) {
-      case 'everyone':
-        return <Globe className="h-4 w-4" />;
-      case 'friends':
-        return <Users className="h-4 w-4" />;
-      case 'only_me':
-        return <Lock className="h-4 w-4" />;
+      case 'everyone': return <Globe className="h-4 w-4" />;
+      case 'friends': return <Users className="h-4 w-4" />;
+      case 'only_me': return <Lock className="h-4 w-4" />;
     }
   };
 
   return (
-    <Card className="shadow-sm" dir={isRTL ? 'rtl' : 'ltr'}>
-      <CardContent className="p-4">
+    <Card className="glass rounded-2xl shadow-card hover:shadow-card-hover transition-all duration-300 border-border/50" dir={isRTL ? 'rtl' : 'ltr'}>
+      <CardContent className="p-5">
         <div className="flex gap-3">
-          <Avatar className="h-10 w-10">
+          <Avatar className="h-11 w-11 ring-2 ring-border">
             <AvatarImage src={profile?.avatar_url || ''} />
-            <AvatarFallback className="bg-primary text-primary-foreground">
+            <AvatarFallback className="gradient-primary text-primary-foreground font-bold">
               {profile?.username?.charAt(0).toUpperCase() || 'U'}
             </AvatarFallback>
           </Avatar>
@@ -207,114 +120,45 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
               placeholder={`What's on your mind, ${profile?.full_name || profile?.username}?`}
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="min-h-[80px] resize-none border-0 bg-muted focus-visible:ring-0 text-base"
+              className="min-h-[80px] resize-none border-0 bg-muted/40 focus-visible:ring-0 text-base rounded-xl p-3"
             />
 
-            {/* Media Preview */}
             {(imagePreview || videoPreview) && (
-              <div className="relative mt-3 rounded-lg overflow-hidden">
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className={`absolute top-2 z-10 h-8 w-8 rounded-full ${isRTL ? 'right-2' : 'left-2'}`}
-                  onClick={clearMedia}
-                >
+              <div className="relative mt-3 rounded-xl overflow-hidden">
+                <Button variant="secondary" size="icon" className={`absolute top-2 z-10 h-8 w-8 rounded-full glass ${isRTL ? 'right-2' : 'left-2'}`} onClick={clearMedia}>
                   <X className="h-4 w-4" />
                 </Button>
-                {imagePreview && (
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-full max-h-80 object-cover rounded-lg"
-                  />
-                )}
-                {videoPreview && (
-                  <video
-                    src={videoPreview}
-                    className="w-full max-h-80 object-cover rounded-lg"
-                    controls
-                  />
-                )}
+                {imagePreview && <img src={imagePreview} alt="Preview" className="w-full max-h-80 object-cover rounded-xl" />}
+                {videoPreview && <video src={videoPreview} className="w-full max-h-80 object-cover rounded-xl" controls />}
               </div>
             )}
 
-            <div className="flex items-center justify-between mt-3 pt-3 border-t">
-              <div className="flex gap-1">
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageSelect}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground"
-                  onClick={() => imageInputRef.current?.click()}
-                >
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
+              <div className="flex gap-0.5">
+                <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+                <Button variant="ghost" size="sm" className="text-muted-foreground rounded-xl hover:text-primary" onClick={() => imageInputRef.current?.click()}>
                   <Image className="h-5 w-5" />
                 </Button>
-                
-                <input
-                  ref={videoInputRef}
-                  type="file"
-                  accept="video/*"
-                  className="hidden"
-                  onChange={handleVideoSelect}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground"
-                  onClick={() => videoInputRef.current?.click()}
-                >
+                <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoSelect} />
+                <Button variant="ghost" size="sm" className="text-muted-foreground rounded-xl hover:text-primary" onClick={() => videoInputRef.current?.click()}>
                   <Video className="h-5 w-5" />
                 </Button>
-                
                 <EmojiPicker onEmojiSelect={handleEmojiSelect} />
               </div>
 
               <div className="flex items-center gap-2">
                 <Select value={visibility} onValueChange={(v: any) => setVisibility(v)}>
-                  <SelectTrigger className="w-[110px] h-9">
-                    <div className="flex items-center gap-2">
-                      {getVisibilityIcon()}
-                      <SelectValue />
-                    </div>
+                  <SelectTrigger className="w-[110px] h-9 rounded-xl border-border/50">
+                    <div className="flex items-center gap-2">{getVisibilityIcon()}<SelectValue /></div>
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="everyone">
-                      <div className="flex items-center gap-2">
-                        <Globe className="h-4 w-4" />
-                        Everyone
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="friends">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        Friends
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="only_me">
-                      <div className="flex items-center gap-2">
-                        <Lock className="h-4 w-4" />
-                        Only me
-                      </div>
-                    </SelectItem>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="everyone"><div className="flex items-center gap-2"><Globe className="h-4 w-4" />Everyone</div></SelectItem>
+                    <SelectItem value="friends"><div className="flex items-center gap-2"><Users className="h-4 w-4" />Friends</div></SelectItem>
+                    <SelectItem value="only_me"><div className="flex items-center gap-2"><Lock className="h-4 w-4" />Only me</div></SelectItem>
                   </SelectContent>
                 </Select>
-
-                <Button
-                  onClick={handleSubmit}
-                  disabled={(!content.trim() && !imageFile && !videoFile) || isLoading}
-                  size="sm"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
+                <Button onClick={handleSubmit} disabled={(!content.trim() && !imageFile && !videoFile) || isLoading} size="sm" className="rounded-xl gradient-primary text-primary-foreground shadow-glow h-9 px-4">
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
