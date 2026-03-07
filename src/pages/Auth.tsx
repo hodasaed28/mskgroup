@@ -53,100 +53,54 @@ export default function Auth() {
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '', phone: '' });
   const [signUpForm, setSignUpForm] = useState({ 
-    email: '', 
-    password: '', 
-    confirmPassword: '',
-    username: '', 
-    fullName: '',
-    phone: ''
+    email: '', password: '', confirmPassword: '', username: '', fullName: '', phone: ''
   });
 
   const loginSchema = z.object({
-    email: authMethod === 'email' 
-      ? z.string().email(t('auth.invalidCredentials'))
-      : z.string().optional(),
-    password: authMethod === 'email' 
-      ? z.string().min(6, t('settings.passwordTooShort'))
-      : z.string().optional(),
-    phone: authMethod === 'phone'
-      ? z.string().min(8, t('auth.invalidCredentials'))
-      : z.string().optional(),
+    email: authMethod === 'email' ? z.string().email(t('auth.invalidCredentials')) : z.string().optional(),
+    password: authMethod === 'email' ? z.string().min(6, t('settings.passwordTooShort')) : z.string().optional(),
+    phone: authMethod === 'phone' ? z.string().min(8, t('auth.invalidCredentials')) : z.string().optional(),
   });
 
   const signUpSchema = z.object({
-    email: authMethod === 'email' 
-      ? z.string().email(t('auth.invalidCredentials'))
-      : z.string().optional(),
+    email: authMethod === 'email' ? z.string().email(t('auth.invalidCredentials')) : z.string().optional(),
     password: authMethod === 'email'
       ? z.string().min(8, 'Password must be at least 8 characters')
           .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
           .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
           .regex(/[0-9]/, 'Password must contain at least one number')
       : z.string().optional(),
-    confirmPassword: authMethod === 'email'
-      ? z.string().min(8, 'Password must be at least 8 characters')
-      : z.string().optional(),
+    confirmPassword: authMethod === 'email' ? z.string().min(8, 'Password must be at least 8 characters') : z.string().optional(),
     username: z.string().min(3, t('auth.dataError')),
     fullName: z.string().min(2, t('auth.dataError')),
-    phone: authMethod === 'phone'
-      ? z.string().min(8, t('auth.invalidCredentials'))
-      : z.string().optional(),
+    phone: authMethod === 'phone' ? z.string().min(8, t('auth.invalidCredentials')) : z.string().optional(),
   }).refine(data => authMethod !== 'email' || data.password === data.confirmPassword, {
-    message: t('settings.passwordMismatch'),
-    path: ['confirmPassword'],
+    message: t('settings.passwordMismatch'), path: ['confirmPassword'],
   });
 
-  // Handle OAuth callback and profile creation
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      // Skip if we're in 2FA step - we handle navigation after 2FA verification
-      if (authStep === '2fa') {
-        return;
-      }
-      
+      if (authStep === '2fa') return;
       if (user) {
-        // Check if profile exists for this user
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', user.id)
-          .single();
-
+        const { data: existingProfile } = await supabase.from('profiles').select('id').eq('id', user.id).single();
         if (!existingProfile) {
-          // Create profile from Google OAuth data
           const metadata = user.user_metadata;
           const username = metadata?.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`;
           const fullName = metadata?.full_name || metadata?.name || '';
-          
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: user.id,
-              username: username,
-              full_name: fullName,
-              avatar_url: metadata?.avatar_url || metadata?.picture || null,
+          const { error: profileError } = await supabase.from('profiles').insert({
+            id: user.id, username, full_name: fullName,
+            avatar_url: metadata?.avatar_url || metadata?.picture || null,
+          });
+          if (profileError?.code === '23505') {
+            await supabase.from('profiles').insert({
+              id: user.id, username: `${username}_${Date.now().toString(36)}`,
+              full_name: fullName, avatar_url: metadata?.avatar_url || metadata?.picture || null,
             });
-
-          if (profileError) {
-            console.error('Error creating profile:', profileError);
-            // If username exists, try with a unique suffix
-            if (profileError.code === '23505') {
-              await supabase
-                .from('profiles')
-                .insert({
-                  id: user.id,
-                  username: `${username}_${Date.now().toString(36)}`,
-                  full_name: fullName,
-                  avatar_url: metadata?.avatar_url || metadata?.picture || null,
-                });
-            }
           }
         }
-
         navigate('/');
       }
     };
-
     handleOAuthCallback();
   }, [user, navigate, authStep]);
 
@@ -162,693 +116,337 @@ export default function Auth() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/`,
-        },
+        options: { redirectTo: `${window.location.origin}/` },
       });
-
-      if (error) {
-        toast({
-          title: t('auth.error'),
-          description: error.message,
-          variant: 'destructive',
-        });
-      }
+      if (error) toast({ title: t('auth.error'), description: error.message, variant: 'destructive' });
     } catch (error: any) {
-      toast({
-        title: t('auth.error'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsGoogleLoading(false);
-    }
+      toast({ title: t('auth.error'), description: error.message, variant: 'destructive' });
+    } finally { setIsGoogleLoading(false); }
   };
 
   const handlePhoneSignIn = async () => {
     const fullPhone = `${selectedCountry.dialCode}${loginForm.phone}`;
     setIsLoading(true);
-    
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: fullPhone,
-      });
-
-      if (error) {
-        toast({
-          title: t('auth.error'),
-          description: error.message,
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      setPhoneVerificationId(fullPhone);
-      setAuthStep('otp');
-      setResendTimer(60);
-      toast({
-        title: t('auth.verifyOtp'),
-        description: `${t('auth.enterOtp')} ${fullPhone}`,
-      });
+      const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
+      if (error) { toast({ title: t('auth.error'), description: error.message, variant: 'destructive' }); setIsLoading(false); return; }
+      setPhoneVerificationId(fullPhone); setAuthStep('otp'); setResendTimer(60);
+      toast({ title: t('auth.verifyOtp'), description: `${t('auth.enterOtp')} ${fullPhone}` });
     } catch (error: any) {
-      toast({
-        title: t('auth.error'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
+      toast({ title: t('auth.error'), description: error.message, variant: 'destructive' });
+    } finally { setIsLoading(false); }
   };
 
   const handlePhoneSignUp = async () => {
     const fullPhone = `${selectedCountry.dialCode}${signUpForm.phone}`;
     setIsLoading(true);
-    
     try {
       const { error } = await supabase.auth.signInWithOtp({
         phone: fullPhone,
-        options: {
-          data: {
-            username: signUpForm.username,
-            full_name: signUpForm.fullName,
-          },
-        },
+        options: { data: { username: signUpForm.username, full_name: signUpForm.fullName } },
       });
-
-      if (error) {
-        toast({
-          title: t('auth.error'),
-          description: error.message,
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      setPhoneVerificationId(fullPhone);
-      setAuthStep('otp');
-      setResendTimer(60);
-      toast({
-        title: t('auth.verifyOtp'),
-        description: `${t('auth.enterOtp')} ${fullPhone}`,
-      });
+      if (error) { toast({ title: t('auth.error'), description: error.message, variant: 'destructive' }); setIsLoading(false); return; }
+      setPhoneVerificationId(fullPhone); setAuthStep('otp'); setResendTimer(60);
+      toast({ title: t('auth.verifyOtp'), description: `${t('auth.enterOtp')} ${fullPhone}` });
     } catch (error: any) {
-      toast({
-        title: t('auth.error'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
+      toast({ title: t('auth.error'), description: error.message, variant: 'destructive' });
+    } finally { setIsLoading(false); }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (authMethod === 'phone') {
       const result = loginSchema.safeParse(loginForm);
-      if (!result.success) {
-        toast({
-          title: t('auth.dataError'),
-          description: result.error.errors[0].message,
-          variant: 'destructive',
-        });
-        return;
-      }
-      await handlePhoneSignIn();
-      return;
+      if (!result.success) { toast({ title: t('auth.dataError'), description: result.error.errors[0].message, variant: 'destructive' }); return; }
+      await handlePhoneSignIn(); return;
     }
-
     const result = loginSchema.safeParse(loginForm);
-    if (!result.success) {
-      toast({
-        title: t('auth.dataError'),
-        description: result.error.errors[0].message,
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!result.success) { toast({ title: t('auth.dataError'), description: result.error.errors[0].message, variant: 'destructive' }); return; }
 
     setIsLoading(true);
-    const { error, data } = await supabase.auth.signInWithPassword({
-      email: loginForm.email,
-      password: loginForm.password,
-    });
-    
-    if (error) {
-      setIsLoading(false);
-      toast({
-        title: t('auth.error'),
-        description: t('auth.invalidCredentials'),
-        variant: 'destructive',
-      });
-      return;
-    }
+    const { error, data } = await supabase.auth.signInWithPassword({ email: loginForm.email, password: loginForm.password });
+    if (error) { setIsLoading(false); toast({ title: t('auth.error'), description: t('auth.invalidCredentials'), variant: 'destructive' }); return; }
 
-    // Check if user has 2FA enabled
     if (data.user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('two_factor_enabled')
-        .eq('id', data.user.id)
-        .single();
-
+      const { data: profile } = await supabase.from('profiles').select('two_factor_enabled').eq('id', data.user.id).single();
       if (profile && (profile as any).two_factor_enabled) {
-        // Sign out temporarily and redirect to 2FA page
-        await supabase.auth.signOut();
-        setIsLoading(false);
-        navigate('/2fa', {
-          state: {
-            userId: data.user.id,
-            userEmail: data.user.email || loginForm.email,
-            email: loginForm.email,
-            password: loginForm.password,
-          },
-        });
+        await supabase.auth.signOut(); setIsLoading(false);
+        navigate('/2fa', { state: { userId: data.user.id, userEmail: data.user.email || loginForm.email, email: loginForm.email, password: loginForm.password } });
         return;
       }
     }
-
     setIsLoading(false);
-    toast({
-      title: t('auth.welcomeBack'),
-      description: t('auth.loginSuccess'),
-    });
+    toast({ title: t('auth.welcomeBack'), description: t('auth.loginSuccess') });
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     const result = signUpSchema.safeParse(signUpForm);
-    if (!result.success) {
-      toast({
-        title: t('auth.dataError'),
-        description: result.error.errors[0].message,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Additional password validation with leaked password check
+    if (!result.success) { toast({ title: t('auth.dataError'), description: result.error.errors[0].message, variant: 'destructive' }); return; }
     if (authMethod === 'email') {
       const passwordValidation = validatePassword(signUpForm.password);
-      if (!passwordValidation.isValid) {
-        toast({
-          title: t('auth.dataError'),
-          description: passwordValidation.errors[0],
-          variant: 'destructive',
-        });
-        return;
-      }
+      if (!passwordValidation.isValid) { toast({ title: t('auth.dataError'), description: passwordValidation.errors[0], variant: 'destructive' }); return; }
     }
-
-    if (authMethod === 'phone') {
-      await handlePhoneSignUp();
-      return;
-    }
+    if (authMethod === 'phone') { await handlePhoneSignUp(); return; }
 
     setIsLoading(true);
-    const { error } = await signUp(
-      signUpForm.email,
-      signUpForm.password,
-      signUpForm.username,
-      signUpForm.fullName
-    );
+    const { error } = await signUp(signUpForm.email, signUpForm.password, signUpForm.username, signUpForm.fullName);
     setIsLoading(false);
-
     if (error) {
       let message = t('auth.error');
-      if (error.message.includes('already registered')) {
-        message = t('auth.emailExists');
-      }
-      toast({
-        title: t('auth.error'),
-        description: message,
-        variant: 'destructive',
-      });
+      if (error.message.includes('already registered')) message = t('auth.emailExists');
+      toast({ title: t('auth.error'), description: message, variant: 'destructive' });
     } else {
-      toast({
-        title: t('auth.accountCreated'),
-        description: t('auth.welcomeBack'),
-      });
+      toast({ title: t('auth.accountCreated'), description: t('auth.welcomeBack') });
     }
   };
 
   const handleVerifyOtp = async () => {
     if (otp.length !== 6 || !phoneVerificationId) return;
-    
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        phone: phoneVerificationId,
-        token: otp,
-        type: 'sms',
-      });
-
-      if (error) {
-        toast({
-          title: t('auth.error'),
-          description: error.message,
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      toast({
-        title: t('auth.loginSuccess'),
-      });
-      navigate('/');
+      const { error } = await supabase.auth.verifyOtp({ phone: phoneVerificationId, token: otp, type: 'sms' });
+      if (error) { toast({ title: t('auth.error'), description: error.message, variant: 'destructive' }); setIsLoading(false); return; }
+      toast({ title: t('auth.loginSuccess') }); navigate('/');
     } catch (error: any) {
-      toast({
-        title: t('auth.error'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
+      toast({ title: t('auth.error'), description: error.message, variant: 'destructive' });
+    } finally { setIsLoading(false); }
   };
 
   const handleResendOtp = async () => {
     if (!phoneVerificationId) return;
-    
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: phoneVerificationId,
-      });
-
-      if (error) {
-        toast({
-          title: t('auth.error'),
-          description: error.message,
-          variant: 'destructive',
-        });
-        return;
-      }
-
+      const { error } = await supabase.auth.signInWithOtp({ phone: phoneVerificationId });
+      if (error) { toast({ title: t('auth.error'), description: error.message, variant: 'destructive' }); return; }
       setResendTimer(60);
-      toast({
-        title: t('auth.resendOtp'),
-        description: `${t('auth.enterOtp')} ${phoneVerificationId}`,
-      });
+      toast({ title: t('auth.resendOtp'), description: `${t('auth.enterOtp')} ${phoneVerificationId}` });
     } catch (error: any) {
-      toast({
-        title: t('auth.error'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
+      toast({ title: t('auth.error'), description: error.message, variant: 'destructive' });
+    } finally { setIsLoading(false); }
   };
 
   const renderOtpStep = () => (
     <div className="space-y-6">
       <div className="text-center">
+        <div className="w-16 h-16 gradient-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-glow">
+          <Phone className="h-7 w-7 text-primary-foreground" />
+        </div>
         <p className="text-muted-foreground mb-4">
-          {t('auth.enterOtp')}
-          <br />
-          <strong>{phoneVerificationId}</strong>
+          {t('auth.enterOtp')}<br /><strong className="text-foreground">{phoneVerificationId}</strong>
         </p>
       </div>
       <div className="flex justify-center" dir="ltr">
         <InputOTP value={otp} onChange={setOtp} maxLength={6}>
           <InputOTPGroup>
-            <InputOTPSlot index={0} />
-            <InputOTPSlot index={1} />
-            <InputOTPSlot index={2} />
-            <InputOTPSlot index={3} />
-            <InputOTPSlot index={4} />
-            <InputOTPSlot index={5} />
+            {[0,1,2,3,4,5].map(i => <InputOTPSlot key={i} index={i} className="rounded-xl border-border" />)}
           </InputOTPGroup>
         </InputOTP>
       </div>
-      <Button 
-        onClick={handleVerifyOtp} 
-        className="w-full" 
-        disabled={isLoading || otp.length !== 6}
-      >
+      <Button onClick={handleVerifyOtp} className="w-full h-12 rounded-xl gradient-primary text-primary-foreground font-semibold shadow-glow hover:shadow-glow-lg transition-all" disabled={isLoading || otp.length !== 6}>
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('auth.verifyOtp')}
       </Button>
       <div className="text-center">
         {resendTimer > 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {t('auth.resendIn')} {resendTimer}s
-          </p>
+          <p className="text-sm text-muted-foreground">{t('auth.resendOtp')} ({resendTimer}s)</p>
         ) : (
-          <Button variant="link" onClick={handleResendOtp} disabled={isLoading}>
-            {t('auth.resendOtp')}
-          </Button>
+          <Button variant="link" onClick={handleResendOtp} disabled={isLoading}>{t('auth.resendOtp')}</Button>
         )}
       </div>
-      <Button 
-        variant="ghost" 
-        className="w-full" 
-        onClick={() => {
-          setAuthStep('credentials');
-          setOtp('');
-          setPhoneVerificationId(null);
-        }}
-      >
-        ← {t('common.back') || 'Back'}
+      <Button variant="ghost" className="w-full" onClick={() => { setAuthStep('credentials'); setOtp(''); }}>
+        {t('common.back')}
       </Button>
     </div>
   );
 
-  const render2FAStep = () => (
-    <TwoFactorVerify
-      userId={pending2FAUser?.id || ''}
-      userEmail={pending2FAUser?.email || ''}
-      onVerified={async () => {
-        // Re-authenticate after 2FA verification
-        setIsLoading(true);
-        const { error, data } = await supabase.auth.signInWithPassword({
-          email: loginForm.email,
-          password: loginForm.password,
-        });
-        setIsLoading(false);
-        
-        if (error) {
-          toast({
-            title: t('auth.error'),
-            description: t('auth.invalidCredentials'),
-            variant: 'destructive',
-          });
-          setAuthStep('credentials');
-          setPending2FAUser(null);
-        } else {
-          // Successfully authenticated after 2FA - navigate directly
-          toast({
-            title: t('auth.welcomeBack'),
-            description: t('auth.loginSuccess'),
-          });
-          setPending2FAUser(null);
-          navigate('/');
-        }
-      }}
-      onBack={() => {
-        setAuthStep('credentials');
-        setPending2FAUser(null);
-      }}
-    />
-  );
+  const features = [
+    { icon: Users, title: t('auth.feature1Title'), desc: t('auth.feature1Desc'), color: 'from-primary to-accent' },
+    { icon: MessageCircle, title: t('auth.feature2Title'), desc: t('auth.feature2Desc'), color: 'from-accent to-primary' },
+    { icon: Heart, title: t('auth.feature3Title'), desc: t('auth.feature3Desc'), color: 'from-primary to-accent' },
+    { icon: Share2, title: t('auth.feature4Title'), desc: t('auth.feature4Desc'), color: 'from-accent to-primary' },
+  ];
 
-  const renderPhoneInput = (value: string, onChange: (val: string) => void) => (
-    <div className="flex gap-2" dir="ltr">
-      <Select
-        value={selectedCountry.code}
-        onValueChange={(code) => {
-          const country = countries.find(c => c.code === code);
-          if (country) setSelectedCountry(country);
-        }}
-      >
-        <SelectTrigger className="w-[140px]">
-          <SelectValue>
-            {selectedCountry.flag} {selectedCountry.dialCode}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent className="max-h-60">
-          {countries.map((country) => (
-            <SelectItem key={country.code} value={country.code}>
-              {country.flag} {country.name} ({country.dialCode})
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Input
-        type="tel"
-        placeholder="5xxxxxxxx"
-        value={value}
-        onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
-        className="flex-1"
-      />
-    </div>
-  );
-
-  const GoogleIcon = () => (
-    <svg className="h-5 w-5" viewBox="0 0 24 24">
-      <path
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-        fill="#4285F4"
-      />
-      <path
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-        fill="#34A853"
-      />
-      <path
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-        fill="#EA4335"
-      />
-    </svg>
-  );
+  if (authStep === 'otp') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" dir={isRTL ? 'rtl' : 'ltr'}>
+        <div className="absolute top-4 right-4 flex gap-2"><ThemeToggle /><LanguageSelector /></div>
+        <Card className="w-full max-w-md glass-strong rounded-2xl shadow-elevated border-border/50 animate-scale-in">
+          <CardContent className="p-8">{renderOtpStep()}</CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-primary/5 flex items-center justify-center p-4" dir={isRTL ? 'rtl' : 'ltr'}>
-      <div className="absolute top-4 right-4 flex items-center gap-2">
-        <ThemeToggle />
-        <LanguageSelector />
-      </div>
-      
-      <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-8 items-center">
-        {/* Hero Section */}
-        <div className="hidden lg:flex flex-col gap-6 text-center lg:text-start">
-          <h1 className="text-5xl font-bold text-primary">MSK</h1>
-          <p className="text-xl text-muted-foreground">
-            {t('app.description')}
-          </p>
-          <div className="grid grid-cols-2 gap-4 mt-8">
-            <div className="flex items-center gap-3 p-4 bg-card rounded-lg shadow-sm">
-              <Users className="h-8 w-8 text-primary" />
-              <div className={isRTL ? 'text-right' : 'text-left'}>
-                <p className="font-semibold">{t('features.newFriends')}</p>
-                <p className="text-sm text-muted-foreground">{t('features.newFriendsDesc')}</p>
+    <div className="min-h-screen flex" dir={isRTL ? 'rtl' : 'ltr'}>
+      {/* Left: Hero */}
+      <div className="hidden lg:flex lg:w-1/2 gradient-primary animate-gradient relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,hsl(var(--accent)/0.3),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,hsl(var(--primary)/0.2),transparent_50%)]" />
+        <div className="relative z-10 flex flex-col justify-center items-center w-full p-12 text-primary-foreground">
+          <div className="w-20 h-20 bg-primary-foreground/20 backdrop-blur-xl rounded-3xl flex items-center justify-center mb-8 animate-float shadow-2xl">
+            <span className="text-4xl font-black">M</span>
+          </div>
+          <h1 className="text-5xl font-black mb-4 text-center leading-tight">MSK Group</h1>
+          <p className="text-xl text-primary-foreground/80 mb-12 text-center max-w-md">{t('auth.subtitle')}</p>
+          <div className="grid grid-cols-2 gap-4 w-full max-w-lg">
+            {features.map((f, i) => (
+              <div key={i} className="bg-primary-foreground/10 backdrop-blur-md rounded-2xl p-5 border border-primary-foreground/10 transition-all duration-300 hover:bg-primary-foreground/15 hover:scale-[1.02]">
+                <f.icon className="h-7 w-7 mb-3 text-primary-foreground/90" />
+                <h3 className="font-bold text-sm mb-1">{f.title}</h3>
+                <p className="text-xs text-primary-foreground/60">{f.desc}</p>
               </div>
-            </div>
-            <div className="flex items-center gap-3 p-4 bg-card rounded-lg shadow-sm">
-              <MessageCircle className="h-8 w-8 text-primary" />
-              <div className={isRTL ? 'text-right' : 'text-left'}>
-                <p className="font-semibold">{t('features.instantChat')}</p>
-                <p className="text-sm text-muted-foreground">{t('features.instantChatDesc')}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-4 bg-card rounded-lg shadow-sm">
-              <Heart className="h-8 w-8 text-primary" />
-              <div className={isRTL ? 'text-right' : 'text-left'}>
-                <p className="font-semibold">{t('features.likes')}</p>
-                <p className="text-sm text-muted-foreground">{t('features.likesDesc')}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-4 bg-card rounded-lg shadow-sm">
-              <Share2 className="h-8 w-8 text-primary" />
-              <div className={isRTL ? 'text-right' : 'text-left'}>
-                <p className="font-semibold">{t('features.share')}</p>
-                <p className="text-sm text-muted-foreground">{t('features.shareDesc')}</p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
+      </div>
 
-        {/* Auth Card */}
-        <Card className="w-full max-w-md mx-auto shadow-xl border-0">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl lg:hidden text-primary">MSK</CardTitle>
-            <CardDescription>
-              {t('auth.joinCommunity')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {authStep === '2fa' ? render2FAStep() : authStep === 'otp' ? renderOtpStep() : (
-              <>
-                {/* Google Sign In */}
-                <Button
-                  variant="outline"
-                  className="w-full mb-4 gap-2"
-                  onClick={handleGoogleSignIn}
-                  disabled={isGoogleLoading}
-                >
-                  {isGoogleLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <GoogleIcon />
-                  )}
-                  {t('auth.google')}
-                </Button>
+      {/* Right: Form */}
+      <div className="flex-1 flex items-center justify-center bg-background p-4 sm:p-8">
+        <div className="absolute top-4 right-4 flex gap-2 z-10"><ThemeToggle /><LanguageSelector /></div>
+        <div className="w-full max-w-md animate-fade-in-up">
+          {/* Mobile logo */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="w-16 h-16 gradient-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-glow">
+              <span className="text-primary-foreground font-black text-2xl">M</span>
+            </div>
+            <h1 className="text-3xl font-black gradient-text">MSK Group</h1>
+            <p className="text-muted-foreground mt-1">{t('auth.subtitle')}</p>
+          </div>
 
-                <div className="relative mb-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">
-                      {t('auth.orContinueWith')}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Auth Method Toggle */}
-                <div className="flex gap-2 mb-6">
-                  <Button
-                    variant={authMethod === 'email' ? 'default' : 'outline'}
-                    className="flex-1"
-                    onClick={() => setAuthMethod('email')}
+          <Card className="glass-strong rounded-2xl shadow-elevated border-border/50">
+            <CardHeader className="text-center pb-2 px-8 pt-8">
+              <CardTitle className="text-2xl font-bold">{t('auth.welcome')}</CardTitle>
+              <CardDescription className="text-muted-foreground">{t('auth.subtitle')}</CardDescription>
+            </CardHeader>
+            <CardContent className="px-8 pb-8">
+              {/* Auth method selector */}
+              <div className="flex gap-2 mb-6 p-1 bg-muted/60 rounded-xl">
+                {[
+                  { method: 'email' as AuthMethod, icon: Mail, label: t('auth.email') },
+                  { method: 'phone' as AuthMethod, icon: Phone, label: t('auth.phone') },
+                ].map(({ method, icon: Icon, label }) => (
+                  <button
+                    key={method}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      authMethod === method ? 'bg-card shadow-card text-foreground' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    onClick={() => setAuthMethod(method)}
                   >
-                    <Mail className="h-4 w-4 mr-2" />
-                    {t('auth.emailAuth')}
-                  </Button>
-                  <Button
-                    variant={authMethod === 'phone' ? 'default' : 'outline'}
-                    className="flex-1"
-                    onClick={() => setAuthMethod('phone')}
-                  >
-                    <Phone className="h-4 w-4 mr-2" />
-                    {t('auth.phoneAuth')}
-                  </Button>
-                </div>
+                    <Icon className="h-4 w-4" />{label}
+                  </button>
+                ))}
+              </div>
 
-                <Tabs defaultValue="login" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mb-6">
-                    <TabsTrigger value="login">{t('auth.login')}</TabsTrigger>
-                    <TabsTrigger value="signup">{t('auth.signup')}</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="login">
-                    <form onSubmit={handleLogin} className="space-y-4">
-                      {authMethod === 'email' ? (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="login-email">{t('auth.email')}</Label>
-                            <Input
-                              id="login-email"
-                              type="email"
-                              placeholder="example@email.com"
-                              value={loginForm.email}
-                              onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="login-password">{t('auth.password')}</Label>
-                            <Input
-                              id="login-password"
-                              type="password"
-                              placeholder="••••••••"
-                              value={loginForm.password}
-                              onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                              required
-                            />
-                          </div>
-                        </>
-                      ) : (
+              <Tabs defaultValue="login" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted/60 rounded-xl h-11">
+                  <TabsTrigger value="login" className="rounded-lg font-semibold data-[state=active]:shadow-card">{t('auth.login')}</TabsTrigger>
+                  <TabsTrigger value="register" className="rounded-lg font-semibold data-[state=active]:shadow-card">{t('auth.register')}</TabsTrigger>
+                </TabsList>
+
+                {/* Login */}
+                <TabsContent value="login">
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    {authMethod === 'email' ? (
+                      <>
                         <div className="space-y-2">
-                          <Label>{t('auth.phone')}</Label>
-                          {renderPhoneInput(loginForm.phone, (val) => setLoginForm({ ...loginForm, phone: val }))}
+                          <Label htmlFor="login-email">{t('auth.email')}</Label>
+                          <Input id="login-email" type="email" className="h-11 rounded-xl" value={loginForm.email} onChange={(e) => setLoginForm({...loginForm, email: e.target.value})} required />
                         </div>
-                      )}
-                      <Button type="submit" className="w-full" disabled={isLoading}>
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : null}
-                        {authMethod === 'phone' ? t('auth.verifyOtp') : t('auth.loginButton')}
-                      </Button>
-                      {authMethod === 'email' && (
-                        <div className="text-center mt-2">
-                          <Button
-                            type="button"
-                            variant="link"
-                            className="text-sm text-muted-foreground"
-                            onClick={() => navigate('/forgot-password')}
-                          >
-                            Forgot your password?
-                          </Button>
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <Label htmlFor="login-password">{t('auth.password')}</Label>
+                            <a href="/forgot-password" className="text-xs text-primary hover:underline">{t('auth.forgotPassword')}</a>
+                          </div>
+                          <PasswordInput id="login-password" className="h-11 rounded-xl" value={loginForm.password} onChange={(v) => setLoginForm({...loginForm, password: v})} />
                         </div>
-                      )}
-                    </form>
-                  </TabsContent>
-                  
-                  <TabsContent value="signup">
-                    <form onSubmit={handleSignUp} className="space-y-4">
+                      </>
+                    ) : (
                       <div className="space-y-2">
-                        <Label htmlFor="signup-fullname">{t('auth.fullName')}</Label>
-                        <Input
-                          id="signup-fullname"
-                          type="text"
-                          placeholder="John Doe"
-                          value={signUpForm.fullName}
-                          onChange={(e) => setSignUpForm({ ...signUpForm, fullName: e.target.value })}
-                          required
-                        />
+                        <Label>{t('auth.phone')}</Label>
+                        <div className="flex gap-2" dir="ltr">
+                          <Select value={selectedCountry.code} onValueChange={(v) => setSelectedCountry(countries.find(c => c.code === v) || countries[0])}>
+                            <SelectTrigger className="w-[120px] h-11 rounded-xl"><SelectValue /></SelectTrigger>
+                            <SelectContent>{countries.map((c) => (<SelectItem key={c.code} value={c.code}>{c.flag} {c.dialCode}</SelectItem>))}</SelectContent>
+                          </Select>
+                          <Input type="tel" className="flex-1 h-11 rounded-xl" value={loginForm.phone} onChange={(e) => setLoginForm({...loginForm, phone: e.target.value})} dir="ltr" required />
+                        </div>
                       </div>
+                    )}
+                    <Button type="submit" className="w-full h-12 rounded-xl gradient-primary text-primary-foreground font-semibold shadow-glow hover:shadow-glow-lg transition-all duration-300" disabled={isLoading}>
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('auth.login')}
+                    </Button>
+                  </form>
+                </TabsContent>
+
+                {/* Register */}
+                <TabsContent value="register">
+                  <form onSubmit={handleSignUp} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label htmlFor="signup-username">{t('auth.username')}</Label>
-                        <Input
-                          id="signup-username"
-                          type="text"
-                          placeholder="johndoe123"
-                          value={signUpForm.username}
-                          onChange={(e) => setSignUpForm({ ...signUpForm, username: e.target.value })}
-                          required
-                        />
+                        <Input id="signup-username" className="h-11 rounded-xl" value={signUpForm.username} onChange={(e) => setSignUpForm({...signUpForm, username: e.target.value})} required />
                       </div>
-                      {authMethod === 'email' ? (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="signup-email">{t('auth.email')}</Label>
-                            <Input
-                              id="signup-email"
-                              type="email"
-                              placeholder="example@email.com"
-                              value={signUpForm.email}
-                              onChange={(e) => setSignUpForm({ ...signUpForm, email: e.target.value })}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="signup-password">{t('auth.password')}</Label>
-                            <PasswordInput
-                              id="signup-password"
-                              value={signUpForm.password}
-                              onChange={(value) => setSignUpForm({ ...signUpForm, password: value })}
-                              showStrength={true}
-                              showRequirements={true}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="signup-confirm-password">{t('auth.confirmPassword')}</Label>
-                            <PasswordInput
-                              id="signup-confirm-password"
-                              value={signUpForm.confirmPassword}
-                              onChange={(value) => setSignUpForm({ ...signUpForm, confirmPassword: value })}
-                            />
-                          </div>
-                        </>
-                      ) : (
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-fullname">{t('auth.fullName')}</Label>
+                        <Input id="signup-fullname" className="h-11 rounded-xl" value={signUpForm.fullName} onChange={(e) => setSignUpForm({...signUpForm, fullName: e.target.value})} required />
+                      </div>
+                    </div>
+                    {authMethod === 'email' ? (
+                      <>
                         <div className="space-y-2">
-                          <Label>{t('auth.phone')}</Label>
-                          {renderPhoneInput(signUpForm.phone, (val) => setSignUpForm({ ...signUpForm, phone: val }))}
+                          <Label htmlFor="signup-email">{t('auth.email')}</Label>
+                          <Input id="signup-email" type="email" className="h-11 rounded-xl" value={signUpForm.email} onChange={(e) => setSignUpForm({...signUpForm, email: e.target.value})} required />
                         </div>
-                      )}
-                      <Button type="submit" className="w-full" disabled={isLoading}>
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : null}
-                        {authMethod === 'phone' ? t('auth.verifyOtp') : t('auth.signupButton')}
-                      </Button>
-                    </form>
-                  </TabsContent>
-                </Tabs>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                        <div className="space-y-2">
+                          <Label htmlFor="signup-password">{t('auth.password')}</Label>
+                          <PasswordInput id="signup-password" className="h-11 rounded-xl" value={signUpForm.password} onChange={(v) => setSignUpForm({...signUpForm, password: v})} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="signup-confirm">{t('auth.confirmPassword')}</Label>
+                          <PasswordInput id="signup-confirm" className="h-11 rounded-xl" value={signUpForm.confirmPassword} onChange={(v) => setSignUpForm({...signUpForm, confirmPassword: v})} />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label>{t('auth.phone')}</Label>
+                        <div className="flex gap-2" dir="ltr">
+                          <Select value={selectedCountry.code} onValueChange={(v) => setSelectedCountry(countries.find(c => c.code === v) || countries[0])}>
+                            <SelectTrigger className="w-[120px] h-11 rounded-xl"><SelectValue /></SelectTrigger>
+                            <SelectContent>{countries.map((c) => (<SelectItem key={c.code} value={c.code}>{c.flag} {c.dialCode}</SelectItem>))}</SelectContent>
+                          </Select>
+                          <Input type="tel" className="flex-1 h-11 rounded-xl" value={signUpForm.phone} onChange={(e) => setSignUpForm({...signUpForm, phone: e.target.value})} dir="ltr" required />
+                        </div>
+                      </div>
+                    )}
+                    <Button type="submit" className="w-full h-12 rounded-xl gradient-primary text-primary-foreground font-semibold shadow-glow hover:shadow-glow-lg transition-all duration-300" disabled={isLoading}>
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('auth.register')}
+                    </Button>
+                  </form>
+                </TabsContent>
+              </Tabs>
+
+              {/* Google */}
+              <div className="mt-6">
+                <div className="relative mb-4">
+                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                  <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-3 text-muted-foreground">{t('auth.or')}</span></div>
+                </div>
+                <Button variant="outline" className="w-full h-12 rounded-xl font-medium hover:bg-muted/80 transition-all" onClick={handleGoogleSignIn} disabled={isGoogleLoading}>
+                  {isGoogleLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : (
+                    <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                  )}
+                  {t('auth.googleSignIn')}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
