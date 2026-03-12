@@ -732,7 +732,7 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-background">
       <Header
         profile={contextProfile}
         notificationCount={notificationCount}
@@ -742,27 +742,32 @@ export default function SettingsPage() {
 
       <div className="container mx-auto px-4 py-8 max-w-2xl" dir={isRTL ? 'rtl' : 'ltr'}>
         {/* Page Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">{t('settings.accountSettings')}</h1>
-          <p className="text-muted-foreground">{t('settings.accountSettingsDesc')}</p>
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-12 h-12 gradient-primary rounded-2xl flex items-center justify-center shadow-glow">
+            <Settings className="h-6 w-6 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">{t('settings.accountSettings')}</h1>
+            <p className="text-sm text-muted-foreground">{t('settings.accountSettingsDesc')}</p>
+          </div>
         </div>
 
         {/* Accordion Sections */}
-        <Accordion type="single" collapsible className="space-y-4">
+        <Accordion type="single" collapsible className="space-y-3">
           {accordionSections.map((section) => (
             <AccordionItem
               key={section.id}
               value={section.id}
-              className="bg-background rounded-xl border-0 shadow-sm overflow-hidden"
+              className="glass-strong rounded-2xl border-border/50 overflow-hidden shadow-card"
             >
-              <AccordionTrigger className="px-6 py-5 hover:no-underline hover:bg-muted/50 transition-colors [&[data-state=open]]:bg-muted/30">
+              <AccordionTrigger className="px-6 py-5 hover:no-underline hover:bg-muted/30 transition-colors [&[data-state=open]]:bg-muted/20">
                 <div className="flex items-center gap-4 w-full">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <section.icon className="h-6 w-6 text-primary" />
+                  <div className="h-11 w-11 rounded-xl gradient-primary flex items-center justify-center shrink-0 shadow-glow">
+                    <section.icon className="h-5 w-5 text-primary-foreground" />
                   </div>
                   <div className="text-right rtl:text-right ltr:text-left flex-1">
                     <h3 className="font-semibold text-base">{section.title}</h3>
-                    <p className="text-sm text-muted-foreground">{section.description}</p>
+                    <p className="text-xs text-muted-foreground">{section.description}</p>
                   </div>
                 </div>
               </AccordionTrigger>
@@ -774,16 +779,17 @@ export default function SettingsPage() {
         </Accordion>
 
         {/* Footer */}
-        <div className="mt-8 p-6 bg-background rounded-xl text-center">
+        <div className="mt-8 glass rounded-2xl p-6 text-center border-border/50">
           <p className="text-sm text-muted-foreground">
             {t('settings.lastUpdated')}: {lastUpdated || new Date().toLocaleDateString()}
           </p>
           <p className="text-sm text-muted-foreground mt-2">
             {t('settings.needHelp')}{' '}
-            <a href="#" className="text-primary hover:underline">
+            <a href="#" className="text-primary hover:underline font-medium">
               {t('settings.contactSupport')}
             </a>
           </p>
+          <p className="text-xs text-muted-foreground mt-3">© 2026 MSK Group. All rights reserved.</p>
         </div>
       </div>
     </div>
