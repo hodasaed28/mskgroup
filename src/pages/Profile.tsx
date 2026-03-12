@@ -644,24 +644,27 @@ export default function ProfilePage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="friends" className="mt-4">
+            <TabsContent value="friends" className="mt-5">
               {friends.length === 0 ? (
-                <Card className="p-8 text-center text-muted-foreground">لا يوجد أصدقاء بعد</Card>
+                <Card className="glass rounded-2xl p-12 text-center border-border/50">
+                  <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+                  <p className="text-muted-foreground font-medium">لا يوجد أصدقاء بعد</p>
+                </Card>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {friends.map((friend) => (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {friends.map((friend, i) => (
                     <Link key={friend.id} to={`/profile/${friend.id}`}>
-                      <Card className="p-4 hover:bg-muted transition-colors">
-                        <div className="flex flex-col items-center text-center gap-2">
+                      <Card className="glass rounded-2xl p-5 border-border/50 hover-lift transition-all animate-fade-in" style={{ animationDelay: `${i * 0.03}s` }}>
+                        <div className="flex flex-col items-center text-center gap-3">
                           <div className="relative">
-                            <Avatar className="h-16 w-16">
+                            <Avatar className="h-16 w-16 ring-2 ring-border">
                               <AvatarImage src={friend.avatar_url || ''} />
-                              <AvatarFallback className="bg-primary text-primary-foreground">
+                              <AvatarFallback className="gradient-primary text-primary-foreground font-bold">
                                 {friend.username.charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             {(friend as any).is_online && (
-                              <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />
+                              <div className="absolute bottom-0 right-0 w-4 h-4 bg-online rounded-full border-2 border-background" />
                             )}
                           </div>
                           <div>
