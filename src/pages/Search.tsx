@@ -13,8 +13,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/hooks/useLanguage';
-import { Search, UserPlus, Loader2, Users, FileText, Hash, Heart, MessageCircle, Clock, X, TrendingUp } from 'lucide-react';
+import { Search, UserPlus, Loader2, Users, FileText, Hash, Heart, MessageCircle, Clock, X, TrendingUp, Sparkles } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 interface SearchResult {
   people: Profile[];
@@ -41,22 +42,14 @@ export default function SearchPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!authLoading && !user) navigate('/auth');
-  }, [user, authLoading, navigate]);
-
+  useEffect(() => { if (!authLoading && !user) navigate('/auth'); }, [user, authLoading, navigate]);
   useEffect(() => {
     const q = searchParams.get('q');
     const tab = searchParams.get('tab');
     if (q) { setQuery(q); searchAll(q); }
     if (tab) setActiveTab(tab);
   }, [searchParams]);
-
-  useEffect(() => {
-    if (user) fetchRecentSearches();
-  }, [user]);
-
-  // Close dropdown on outside click
+  useEffect(() => { if (user) fetchRecentSearches(); }, [user]);
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
@@ -70,12 +63,7 @@ export default function SearchPage() {
 
   const fetchRecentSearches = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('search_history' as any)
-      .select('query')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    const { data } = await supabase.from('search_history' as any).select('query').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10);
     if (data) {
       const unique = [...new Set((data as any[]).map(d => d.query))];
       setRecentSearches(unique.slice(0, 8));
@@ -103,49 +91,23 @@ export default function SearchPage() {
   const fetchSuggestions = async (q: string) => {
     if (!q.trim() || q.length < 2) { setSuggestions([]); return; }
     const sanitized = q.replace(/[%_\\'"]/g, '').trim();
-    const { data: people } = await supabase
-      .from('profiles_public')
-      .select('username, full_name')
-      .or(`username.ilike.%${sanitized}%,full_name.ilike.%${sanitized}%`)
-      .limit(5);
+    const { data: people } = await supabase.from('profiles_public').select('username, full_name').or(`username.ilike.%${sanitized}%,full_name.ilike.%${sanitized}%`).limit(5);
     const names = (people || []).map(p => (p as any).full_name || (p as any).username).filter(Boolean);
     setSuggestions(names.slice(0, 5));
   };
 
   const searchAll = async (searchQuery: string) => {
-    if (!searchQuery.trim()) {
-      setResults({ people: [], posts: [], hashtags: [] });
-      return;
-    }
+    if (!searchQuery.trim()) { setResults({ people: [], posts: [], hashtags: [] }); return; }
     const sanitizedQuery = searchQuery.replace(/[%_\\'"]/g, '').trim();
     if (!sanitizedQuery) { setResults({ people: [], posts: [], hashtags: [] }); return; }
-
     setLoading(true);
-
-    const { data: peopleData } = await supabase
-      .from('profiles_public')
-      .select('*')
-      .or(`username.ilike.%${sanitizedQuery}%,full_name.ilike.%${sanitizedQuery}%`)
-      .limit(20);
-
-    const { data: postsData } = await supabase
-      .from('posts')
-      .select('*, profiles(*)')
-      .ilike('content', `%${sanitizedQuery}%`)
-      .order('created_at', { ascending: false })
-      .limit(20);
-
+    const { data: peopleData } = await supabase.from('profiles_public').select('*').or(`username.ilike.%${sanitizedQuery}%,full_name.ilike.%${sanitizedQuery}%`).limit(20);
+    const { data: postsData } = await supabase.from('posts').select('*, profiles(*)').ilike('content', `%${sanitizedQuery}%`).order('created_at', { ascending: false }).limit(20);
     let hashtagsData: { name: string; post_count: number }[] = [];
     try {
-      const { data } = await supabase
-        .from('hashtags' as any)
-        .select('name, post_count')
-        .ilike('name', `%${sanitizedQuery}%`)
-        .order('post_count', { ascending: false })
-        .limit(20);
+      const { data } = await supabase.from('hashtags' as any).select('name, post_count').ilike('name', `%${sanitizedQuery}%`).order('post_count', { ascending: false }).limit(20);
       hashtagsData = (data as any) || [];
     } catch {}
-
     setResults({
       people: (peopleData?.filter(p => p.id !== user?.id) || []) as Profile[],
       posts: (postsData || []) as unknown as Post[],
@@ -156,18 +118,11 @@ export default function SearchPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (query.trim()) {
-      setSearchParams({ q: query, tab: activeTab });
-      saveSearchQuery(query);
-      setShowDropdown(false);
-    }
+    if (query.trim()) { setSearchParams({ q: query, tab: activeTab }); saveSearchQuery(query); setShowDropdown(false); }
   };
 
   const handleSelectSuggestion = (q: string) => {
-    setQuery(q);
-    setSearchParams({ q, tab: activeTab });
-    saveSearchQuery(q);
-    setShowDropdown(false);
+    setQuery(q); setSearchParams({ q, tab: activeTab }); saveSearchQuery(q); setShowDropdown(false);
   };
 
   const handleTabChange = (tab: string) => {
@@ -176,37 +131,22 @@ export default function SearchPage() {
   };
 
   const handleInputChange = (value: string) => {
-    setQuery(value);
-    setShowDropdown(true);
-    fetchSuggestions(value);
+    setQuery(value); setShowDropdown(true); fetchSuggestions(value);
   };
 
   const sendFriendRequest = async (userId: string) => {
     if (!user || !profile) return;
-    const { data, error } = await supabase
-      .from('friendships')
-      .insert({ requester_id: user.id, addressee_id: userId })
-      .select().single();
-
+    const { data, error } = await supabase.from('friendships').insert({ requester_id: user.id, addressee_id: userId }).select().single();
     if (!error && data) {
-      await supabase.rpc('create_notification', {
-        p_user_id: userId,
-        p_type: 'friend_request',
-        p_content: `${profile.full_name || profile.username} sent you a friend request`,
-        p_reference_id: data.id,
-      });
-      toast({ title: 'Friend request sent!' });
+      await supabase.rpc('create_notification', { p_user_id: userId, p_type: 'friend_request', p_content: `${profile.full_name || profile.username} أرسل لك طلب صداقة`, p_reference_id: data.id });
+      toast({ title: 'تم إرسال طلب الصداقة!' });
     } else if (error?.code === '23505') {
-      toast({ title: 'Friend request already exists', variant: 'destructive' });
+      toast({ title: 'طلب الصداقة موجود بالفعل', variant: 'destructive' });
     }
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
   const totalResults = results.people.length + results.posts.length + results.hashtags.length;
@@ -217,32 +157,39 @@ export default function SearchPage() {
       <Header profile={profile} notificationCount={notificationCount} messageCount={messageCount} onMessagesClick={toggleChat} />
 
       <div className="container mx-auto px-4 py-6 max-w-2xl" dir={isRTL ? 'rtl' : 'ltr'}>
-        <h1 className="text-2xl font-bold mb-6">{t('nav.search').replace('...', '')}</h1>
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center shadow-glow">
+            <Search className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <h1 className="text-2xl font-bold">البحث</h1>
+        </div>
 
+        {/* Search Input */}
         <form onSubmit={handleSearch} className="mb-6 relative">
-          <div className="relative">
-            <Search className={`absolute top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground ${isRTL ? 'right-3' : 'left-3'}`} />
+          <div className="relative group">
+            <Search className={`absolute top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-colors group-focus-within:text-primary ${isRTL ? 'right-4' : 'left-4'}`} />
             <Input
               ref={inputRef}
-              placeholder={t('nav.search')}
-              className={`h-12 text-lg ${isRTL ? 'pr-10' : 'pl-10'}`}
+              placeholder="ابحث عن أشخاص، منشورات، هاشتاقات..."
+              className={`h-12 text-base rounded-xl bg-muted/60 border-0 focus:bg-card focus:shadow-card transition-all ${isRTL ? 'pr-12' : 'pl-12'}`}
               value={query}
               onChange={(e) => handleInputChange(e.target.value)}
               onFocus={() => setShowDropdown(true)}
             />
           </div>
 
-          {/* Dropdown: Recent searches + suggestions */}
+          {/* Dropdown */}
           {showDropdown && (recentSearches.length > 0 || suggestions.length > 0) && !hasQuery && (
-            <div ref={dropdownRef} className="absolute top-full left-0 right-0 z-50 mt-1 bg-card border rounded-lg shadow-lg overflow-hidden">
+            <div ref={dropdownRef} className="absolute top-full left-0 right-0 z-50 mt-2 glass-strong rounded-xl shadow-elevated overflow-hidden border-border/50">
               {suggestions.length > 0 && (
-                <div className="p-2 border-b">
-                  <p className="text-xs text-muted-foreground px-2 py-1 flex items-center gap-1">
+                <div className="p-2 border-b border-border/50">
+                  <p className="text-xs text-muted-foreground px-3 py-1.5 flex items-center gap-1.5 font-medium">
                     <TrendingUp className="h-3 w-3" /> اقتراحات
                   </p>
                   {suggestions.map((s, i) => (
                     <button key={i} onClick={() => handleSelectSuggestion(s)}
-                      className="w-full text-right px-3 py-2 hover:bg-muted rounded text-sm transition-colors">
+                      className="w-full text-right px-3 py-2.5 hover:bg-muted/80 rounded-lg text-sm transition-colors">
                       {s}
                     </button>
                   ))}
@@ -250,21 +197,17 @@ export default function SearchPage() {
               )}
               {recentSearches.length > 0 && (
                 <div className="p-2">
-                  <div className="flex items-center justify-between px-2 py-1">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <div className="flex items-center justify-between px-3 py-1.5">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
                       <Clock className="h-3 w-3" /> عمليات البحث الأخيرة
                     </p>
-                    <button onClick={clearAllRecentSearches} className="text-xs text-destructive hover:underline">
-                      مسح الكل
-                    </button>
+                    <button onClick={clearAllRecentSearches} className="text-xs text-destructive hover:underline font-medium">مسح الكل</button>
                   </div>
                   {recentSearches.map((s, i) => (
-                    <div key={i} className="flex items-center justify-between px-3 py-2 hover:bg-muted rounded transition-colors">
-                      <button onClick={() => handleSelectSuggestion(s)} className="flex-1 text-right text-sm">
-                        {s}
-                      </button>
-                      <button onClick={() => deleteRecentSearch(s)} className="text-muted-foreground hover:text-destructive p-1">
-                        <X className="h-3 w-3" />
+                    <div key={i} className="flex items-center justify-between px-3 py-2.5 hover:bg-muted/80 rounded-lg transition-colors">
+                      <button onClick={() => handleSelectSuggestion(s)} className="flex-1 text-right text-sm">{s}</button>
+                      <button onClick={() => deleteRecentSearch(s)} className="text-muted-foreground hover:text-destructive p-1 rounded-lg transition-colors">
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   ))}
@@ -274,92 +217,104 @@ export default function SearchPage() {
           )}
         </form>
 
+        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="people" className="gap-2">
+          <TabsList className="grid w-full grid-cols-3 mb-6 bg-muted/60 rounded-xl h-11">
+            <TabsTrigger value="people" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
               <Users className="h-4 w-4" />
-              People ({results.people.length})
+              أشخاص ({results.people.length})
             </TabsTrigger>
-            <TabsTrigger value="posts" className="gap-2">
+            <TabsTrigger value="posts" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
               <FileText className="h-4 w-4" />
-              Posts ({results.posts.length})
+              منشورات ({results.posts.length})
             </TabsTrigger>
-            <TabsTrigger value="hashtags" className="gap-2">
+            <TabsTrigger value="hashtags" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
               <Hash className="h-4 w-4" />
-              Hashtags ({results.hashtags.length})
+              هاشتاقات ({results.hashtags.length})
             </TabsTrigger>
           </TabsList>
 
           {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="flex justify-center py-16">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">جاري البحث...</p>
+              </div>
             </div>
           ) : totalResults === 0 && hasQuery ? (
-            <Card className="p-8 text-center text-muted-foreground">
-              <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No results for "{searchParams.get('q')}"</p>
+            <Card className="glass rounded-2xl p-12 text-center border-border/50">
+              <Search className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
+              <p className="text-muted-foreground font-medium">لا توجد نتائج لـ "{searchParams.get('q')}"</p>
+              <p className="text-sm text-muted-foreground mt-1">جرب كلمات بحث مختلفة</p>
+            </Card>
+          ) : !hasQuery ? (
+            <Card className="glass rounded-2xl p-12 text-center border-border/50">
+              <Sparkles className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
+              <p className="text-muted-foreground font-medium">ابحث عن أصدقاء، منشورات، وهاشتاقات</p>
+              <p className="text-sm text-muted-foreground mt-1">اكتب في حقل البحث أعلاه للبدء</p>
             </Card>
           ) : (
             <>
               <TabsContent value="people" className="space-y-3">
-                {results.people.map((person) => (
-                  <Card key={person.id} className="p-4">
+                {results.people.map((person, i) => (
+                  <Card key={person.id} className="glass rounded-2xl p-5 border-border/50 hover-lift animate-fade-in" style={{ animationDelay: `${i * 0.05}s` }}>
                     <div className="flex items-center gap-4">
                       <Link to={`/profile/${person.id}`}>
-                        <Avatar className="h-14 w-14">
+                        <Avatar className="h-14 w-14 ring-2 ring-border hover:ring-primary/30 transition-all">
                           <AvatarImage src={person.avatar_url || ''} />
-                          <AvatarFallback className="bg-primary text-primary-foreground text-lg">
+                          <AvatarFallback className="gradient-primary text-primary-foreground text-lg font-bold">
                             {person.username.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       </Link>
                       <div className="flex-1 min-w-0">
-                        <Link to={`/profile/${person.id}`} className="font-semibold hover:underline block truncate">
+                        <Link to={`/profile/${person.id}`} className="font-semibold hover:text-primary transition-colors block truncate">
                           {person.full_name || person.username}
                         </Link>
                         <p className="text-sm text-muted-foreground">@{person.username}</p>
                         {person.bio && <p className="text-sm text-muted-foreground truncate mt-1">{person.bio}</p>}
                       </div>
-                      <Button size="sm" onClick={() => sendFriendRequest(person.id)}>
-                        <UserPlus className="h-4 w-4" />
+                      <Button size="sm" className="rounded-xl gradient-primary text-primary-foreground shadow-glow" onClick={() => sendFriendRequest(person.id)}>
+                        <UserPlus className="h-4 w-4 ml-1" />
+                        إضافة
                       </Button>
                     </div>
                   </Card>
                 ))}
                 {results.people.length === 0 && hasQuery && (
-                  <p className="text-center text-muted-foreground py-8">No people found</p>
+                  <p className="text-center text-muted-foreground py-8">لا يوجد أشخاص بهذا الاسم</p>
                 )}
               </TabsContent>
 
               <TabsContent value="posts" className="space-y-3">
-                {results.posts.map((post) => (
+                {results.posts.map((post, i) => (
                   <Link key={post.id} to={`/post/${post.id}`} className="block">
-                    <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                    <Card className="glass rounded-2xl p-5 border-border/50 hover-lift transition-all animate-fade-in cursor-pointer" style={{ animationDelay: `${i * 0.05}s` }}>
                       <div className="flex gap-3">
                         <div onClick={(e) => { e.preventDefault(); navigate(`/profile/${post.user_id}`); }}>
-                          <Avatar className="h-10 w-10">
+                          <Avatar className="h-10 w-10 ring-2 ring-border">
                             <AvatarImage src={post.profiles?.avatar_url || ''} />
-                            <AvatarFallback className="bg-primary text-primary-foreground">
+                            <AvatarFallback className="gradient-primary text-primary-foreground">
                               {post.profiles?.username?.charAt(0).toUpperCase() || 'U'}
                             </AvatarFallback>
                           </Avatar>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold hover:underline" onClick={(e) => { e.preventDefault(); navigate(`/profile/${post.user_id}`); }}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold hover:text-primary transition-colors" onClick={(e) => { e.preventDefault(); navigate(`/profile/${post.user_id}`); }}>
                               {post.profiles?.full_name || post.profiles?.username}
                             </span>
-                            <span className="text-sm text-muted-foreground">
-                              {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: ar })}
                             </span>
                           </div>
-                          <p className="mt-1">{post.content}</p>
+                          <p className="text-sm leading-relaxed line-clamp-2">{post.content}</p>
                           {post.image_url && (
-                            <img src={post.image_url} alt="" className="mt-2 rounded-lg max-h-48 object-cover" />
+                            <img src={post.image_url} alt="" className="mt-2 rounded-xl max-h-48 object-cover w-full" />
                           )}
-                          <div className="flex items-center gap-4 mt-2 text-muted-foreground text-sm">
-                            <span className="flex items-center gap-1"><Heart className="h-4 w-4" /></span>
-                            <span className="flex items-center gap-1"><MessageCircle className="h-4 w-4" /></span>
+                          <div className="flex items-center gap-4 mt-3 text-muted-foreground text-xs">
+                            <span className="flex items-center gap-1"><Heart className="h-3.5 w-3.5" /></span>
+                            <span className="flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" /></span>
                           </div>
                         </div>
                       </div>
@@ -367,29 +322,29 @@ export default function SearchPage() {
                   </Link>
                 ))}
                 {results.posts.length === 0 && hasQuery && (
-                  <p className="text-center text-muted-foreground py-8">No posts found</p>
+                  <p className="text-center text-muted-foreground py-8">لا توجد منشورات مطابقة</p>
                 )}
               </TabsContent>
 
               <TabsContent value="hashtags" className="space-y-3">
-                {results.hashtags.map((hashtag) => (
-                  <Card key={hashtag.name} className="p-4">
+                {results.hashtags.map((hashtag, i) => (
+                  <Card key={hashtag.name} className="glass rounded-2xl p-5 border-border/50 hover-lift animate-fade-in" style={{ animationDelay: `${i * 0.05}s` }}>
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Hash className="h-6 w-6 text-primary" />
+                      <div className="h-12 w-12 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
+                        <Hash className="h-6 w-6 text-primary-foreground" />
                       </div>
                       <div className="flex-1">
-                        <p className="font-semibold text-primary">#{hashtag.name}</p>
-                        <p className="text-sm text-muted-foreground">{hashtag.post_count} posts</p>
+                        <p className="font-bold text-primary">#{hashtag.name}</p>
+                        <p className="text-sm text-muted-foreground">{hashtag.post_count} منشور</p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => handleSelectSuggestion(`#${hashtag.name}`)}>
-                        View
+                      <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => handleSelectSuggestion(`#${hashtag.name}`)}>
+                        عرض
                       </Button>
                     </div>
                   </Card>
                 ))}
                 {results.hashtags.length === 0 && hasQuery && (
-                  <p className="text-center text-muted-foreground py-8">No hashtags found</p>
+                  <p className="text-center text-muted-foreground py-8">لا توجد هاشتاقات مطابقة</p>
                 )}
               </TabsContent>
             </>
