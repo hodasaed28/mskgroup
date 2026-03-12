@@ -504,16 +504,14 @@ export default function ProfilePage() {
               )}
 
               {/* Stats */}
-              <div className="flex items-center gap-4 mt-3 text-sm">
-                <div className="flex items-center gap-1">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-semibold">{friendCount}</span>
-                  <span className="text-muted-foreground">صديق</span>
+              <div className="flex items-center gap-5 mt-4">
+                <div className="glass rounded-xl px-4 py-2 text-center">
+                  <span className="font-bold text-lg block">{friendCount}</span>
+                  <span className="text-xs text-muted-foreground">صديق</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-semibold">{postCount}</span>
-                  <span className="text-muted-foreground">منشور</span>
+                <div className="glass rounded-xl px-4 py-2 text-center">
+                  <span className="font-bold text-lg block">{postCount}</span>
+                  <span className="text-xs text-muted-foreground">منشور</span>
                 </div>
               </div>
 
