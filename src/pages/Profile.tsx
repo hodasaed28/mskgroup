@@ -710,12 +710,12 @@ export default function ProfilePage() {
             </TabsContent>
 
             {isOwnProfile && (
-              <TabsContent value="saved" className="mt-4 space-y-4">
+              <TabsContent value="saved" className="mt-5 space-y-4">
                 {savedPosts.length === 0 ? (
-                  <Card className="p-8 text-center text-muted-foreground">
-                    <Bookmark className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>لا توجد منشورات محفوظة</p>
-                    <p className="text-sm mt-1">احفظ المنشورات التي تعجبك لتجدها هنا</p>
+                  <Card className="glass rounded-2xl p-12 text-center border-border/50">
+                    <Bookmark className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+                    <p className="text-muted-foreground font-medium">لا توجد منشورات محفوظة</p>
+                    <p className="text-sm text-muted-foreground mt-1">احفظ المنشورات التي تعجبك لتجدها هنا</p>
                   </Card>
                 ) : (
                   savedPosts.map((saved) => (
