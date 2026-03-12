@@ -679,22 +679,25 @@ export default function ProfilePage() {
               )}
             </TabsContent>
 
-            <TabsContent value="photos" className="mt-4">
+            <TabsContent value="photos" className="mt-5">
               {photos.length === 0 ? (
-                <Card className="p-8 text-center text-muted-foreground">لا توجد صور بعد</Card>
+                <Card className="glass rounded-2xl p-12 text-center border-border/50">
+                  <ImageIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+                  <p className="text-muted-foreground font-medium">لا توجد صور بعد</p>
+                </Card>
               ) : (
                 <>
                   <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
                     {photos.map((photo, index) => (
-                      <div key={index} className="aspect-square cursor-pointer overflow-hidden rounded-lg hover:opacity-90 transition-opacity"
+                      <div key={index} className="aspect-square cursor-pointer overflow-hidden rounded-xl hover:opacity-80 hover:scale-[1.02] transition-all"
                         onClick={() => setSelectedPhoto(photo)}>
                         <img src={photo} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
                       </div>
                     ))}
                   </div>
                   <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
-                    <DialogContent className="sm:max-w-4xl bg-black/90 border-0 p-0">
-                      <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white hover:bg-white/20 z-10" onClick={() => setSelectedPhoto(null)}>
+                    <DialogContent className="sm:max-w-4xl bg-black/90 border-0 p-0 rounded-2xl">
+                      <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white hover:bg-white/20 z-10 rounded-xl" onClick={() => setSelectedPhoto(null)}>
                         <X className="h-6 w-6" />
                       </Button>
                       <div className="flex items-center justify-center min-h-[60vh]">
