@@ -562,23 +562,26 @@ export default function ProfilePage() {
           </div>
 
           {/* Tabs */}
-          <Tabs defaultValue="posts" className="mt-6">
-            <TabsList className="w-full justify-start flex-wrap">
-              <TabsTrigger value="posts">المنشورات</TabsTrigger>
-              <TabsTrigger value="about">حول</TabsTrigger>
-              <TabsTrigger value="friends">الأصدقاء</TabsTrigger>
-              <TabsTrigger value="photos">الصور</TabsTrigger>
+          <Tabs defaultValue="posts" className="mt-8">
+            <TabsList className="w-full justify-start flex-wrap bg-muted/60 rounded-xl h-11 gap-0">
+              <TabsTrigger value="posts" className="rounded-lg font-semibold data-[state=active]:shadow-card">المنشورات</TabsTrigger>
+              <TabsTrigger value="about" className="rounded-lg font-semibold data-[state=active]:shadow-card">حول</TabsTrigger>
+              <TabsTrigger value="friends" className="rounded-lg font-semibold data-[state=active]:shadow-card">الأصدقاء</TabsTrigger>
+              <TabsTrigger value="photos" className="rounded-lg font-semibold data-[state=active]:shadow-card">الصور</TabsTrigger>
               {isOwnProfile && (
-                <TabsTrigger value="saved">
+                <TabsTrigger value="saved" className="rounded-lg font-semibold data-[state=active]:shadow-card">
                   <Bookmark className="h-4 w-4 ml-1" />
                   المحفوظات
                 </TabsTrigger>
               )}
             </TabsList>
 
-            <TabsContent value="posts" className="mt-4 space-y-4">
+            <TabsContent value="posts" className="mt-5 space-y-4">
               {sortedPosts.length === 0 ? (
-                <Card className="p-8 text-center text-muted-foreground">لا توجد منشورات بعد</Card>
+                <Card className="glass rounded-2xl p-12 text-center border-border/50">
+                  <ImageIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+                  <p className="text-muted-foreground font-medium">لا توجد منشورات بعد</p>
+                </Card>
               ) : (
                 sortedPosts.map((post) => (
                   <div key={post.id} className="relative">
