@@ -357,14 +357,19 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto" dir="rtl">
         {/* Cover Photo */}
         <div 
-          className="h-48 md:h-72 bg-gradient-to-r from-primary to-primary/60 rounded-b-lg relative cursor-pointer overflow-hidden"
+          className="h-56 md:h-80 gradient-primary relative cursor-pointer overflow-hidden"
           onClick={() => (profile as any).cover_url && setShowCoverFullView(true)}
           style={(profile as any).cover_url ? { backgroundImage: `url(${(profile as any).cover_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
         >
+          {/* Gradient overlay */}
+          {!(profile as any).cover_url && (
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,hsl(var(--accent)/0.3),transparent_60%)]" />
+          )}
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent" />
           {isOwnProfile && (
             <>
               <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
-              <Button variant="secondary" size="sm" className="absolute bottom-4 left-4"
+              <Button variant="secondary" size="sm" className="absolute bottom-4 left-4 rounded-xl glass border-0"
                 onClick={(e) => { e.stopPropagation(); coverInputRef.current?.click(); }} disabled={uploading}>
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Camera className="h-4 w-4 ml-2" />}
                 تغيير الغلاف
