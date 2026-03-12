@@ -394,12 +394,12 @@ export default function ProfilePage() {
 
         {/* Profile Info */}
         <div className="px-4 md:px-8">
-          <div className="flex flex-col md:flex-row items-start md:items-end gap-4 -mt-16 md:-mt-20">
+          <div className="flex flex-col md:flex-row items-start md:items-end gap-4 -mt-20 md:-mt-24">
             {/* Avatar with options */}
             <Dialog open={showAvatarOptions} onOpenChange={setShowAvatarOptions}>
               <DialogTrigger asChild>
                 <div className={`relative cursor-pointer group ${hasStory ? 'ring-4 ring-primary ring-offset-2 ring-offset-background rounded-full' : ''}`}>
-                  <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-background">
+                  <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-background shadow-elevated">
                     <AvatarImage src={profile.avatar_url || ''} />
                     <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
                       {profile.username.charAt(0).toUpperCase()}
