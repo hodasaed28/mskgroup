@@ -608,29 +608,38 @@ export default function ProfilePage() {
               )}
             </TabsContent>
 
-            <TabsContent value="about" className="mt-4">
-              <Card className="p-6">
-                <h3 className="font-semibold mb-4">معلومات عامة</h3>
-                <div className="space-y-3 text-sm">
-                  <p><span className="text-muted-foreground">اسم المستخدم:</span> @{profile.username}</p>
+            <TabsContent value="about" className="mt-5">
+              <Card className="glass rounded-2xl p-6 border-border/50">
+                <h3 className="font-semibold mb-5 text-lg">معلومات عامة</h3>
+                <div className="space-y-4 text-sm">
+                  <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
+                    <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div><span className="text-muted-foreground text-xs block">اسم المستخدم</span><span className="font-medium">@{profile.username}</span></div>
+                  </div>
                   {profile.full_name && (
-                    <p><span className="text-muted-foreground">الاسم الكامل:</span> {profile.full_name}</p>
+                    <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
+                      <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div><span className="text-muted-foreground text-xs block">الاسم الكامل</span><span className="font-medium">{profile.full_name}</span></div>
+                    </div>
                   )}
                   {profile.bio && (
-                    <p><span className="text-muted-foreground">نبذة:</span> {profile.bio}</p>
+                    <div className="p-3 bg-muted/40 rounded-xl">
+                      <span className="text-muted-foreground text-xs block mb-1">نبذة</span>
+                      <p className="leading-relaxed">{profile.bio}</p>
+                    </div>
                   )}
                   {(profile as any).link_url && (
-                    <p>
-                      <span className="text-muted-foreground">الرابط:</span>{' '}
-                      <a href={(profile as any).link_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                        {(profile as any).link_url}
-                      </a>
-                    </p>
+                    <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
+                      <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div><span className="text-muted-foreground text-xs block">الرابط</span>
+                        <a href={(profile as any).link_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">{(profile as any).link_url}</a>
+                      </div>
+                    </div>
                   )}
-                  <p>
-                    <span className="text-muted-foreground">تاريخ الانضمام:</span>{' '}
-                    {new Date(profile.created_at).toLocaleDateString('ar-EG')}
-                  </p>
+                  <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
+                    <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div><span className="text-muted-foreground text-xs block">تاريخ الانضمام</span><span className="font-medium">{new Date(profile.created_at).toLocaleDateString('ar-EG')}</span></div>
+                  </div>
                 </div>
               </Card>
             </TabsContent>
