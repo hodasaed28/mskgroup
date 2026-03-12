@@ -34,7 +34,7 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
   const [showVoiceCall, setShowVoiceCall] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();

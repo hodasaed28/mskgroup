@@ -49,7 +49,7 @@ export function VideoCallDialog({
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const callTimerRef = useRef<NodeJS.Timeout>();
+  const callTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (open && !isIncoming) {
