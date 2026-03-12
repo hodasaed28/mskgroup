@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, UserPlus, MessageCircle, Check, X, Loader2, UserMinus, Eye, Upload, PlayCircle, Bookmark, Users, Image as ImageIcon, Link as LinkIcon, Pin, PinOff, Globe, Edit3 } from 'lucide-react';
+import { Camera, UserPlus, MessageCircle, Check, X, Loader2, UserMinus, Eye, Upload, PlayCircle, Bookmark, Users, Image as ImageIcon, Link as LinkIcon, Pin, PinOff, Globe, Edit3, User } from 'lucide-react';
 import { OnlineIndicator } from '@/components/ui/online-indicator';
 
 export default function ProfilePage() {
