@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, UserPlus, MessageCircle, Check, X, Loader2, UserMinus, Eye, Upload, PlayCircle, Bookmark, Users, Image as ImageIcon, Link as LinkIcon, Pin, PinOff, Globe, Edit3 } from 'lucide-react';
+import { Camera, UserPlus, MessageCircle, Check, X, Loader2, UserMinus, Eye, Upload, PlayCircle, Bookmark, Users, Image as ImageIcon, Link as LinkIcon, Pin, PinOff, Globe, Edit3, User } from 'lucide-react';
 import { OnlineIndicator } from '@/components/ui/online-indicator';
 
 export default function ProfilePage() {
@@ -357,14 +357,19 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto" dir="rtl">
         {/* Cover Photo */}
         <div 
-          className="h-48 md:h-72 bg-gradient-to-r from-primary to-primary/60 rounded-b-lg relative cursor-pointer overflow-hidden"
+          className="h-56 md:h-80 gradient-primary relative cursor-pointer overflow-hidden"
           onClick={() => (profile as any).cover_url && setShowCoverFullView(true)}
           style={(profile as any).cover_url ? { backgroundImage: `url(${(profile as any).cover_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
         >
+          {/* Gradient overlay */}
+          {!(profile as any).cover_url && (
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,hsl(var(--accent)/0.3),transparent_60%)]" />
+          )}
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent" />
           {isOwnProfile && (
             <>
               <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
-              <Button variant="secondary" size="sm" className="absolute bottom-4 left-4"
+              <Button variant="secondary" size="sm" className="absolute bottom-4 left-4 rounded-xl glass border-0"
                 onClick={(e) => { e.stopPropagation(); coverInputRef.current?.click(); }} disabled={uploading}>
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Camera className="h-4 w-4 ml-2" />}
                 تغيير الغلاف
@@ -389,12 +394,12 @@ export default function ProfilePage() {
 
         {/* Profile Info */}
         <div className="px-4 md:px-8">
-          <div className="flex flex-col md:flex-row items-start md:items-end gap-4 -mt-16 md:-mt-20">
+          <div className="flex flex-col md:flex-row items-start md:items-end gap-4 -mt-20 md:-mt-24">
             {/* Avatar with options */}
             <Dialog open={showAvatarOptions} onOpenChange={setShowAvatarOptions}>
               <DialogTrigger asChild>
                 <div className={`relative cursor-pointer group ${hasStory ? 'ring-4 ring-primary ring-offset-2 ring-offset-background rounded-full' : ''}`}>
-                  <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-background">
+                  <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-background shadow-elevated">
                     <AvatarImage src={profile.avatar_url || ''} />
                     <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
                       {profile.username.charAt(0).toUpperCase()}
@@ -499,16 +504,14 @@ export default function ProfilePage() {
               )}
 
               {/* Stats */}
-              <div className="flex items-center gap-4 mt-3 text-sm">
-                <div className="flex items-center gap-1">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-semibold">{friendCount}</span>
-                  <span className="text-muted-foreground">صديق</span>
+              <div className="flex items-center gap-5 mt-4">
+                <div className="glass rounded-xl px-4 py-2 text-center">
+                  <span className="font-bold text-lg block">{friendCount}</span>
+                  <span className="text-xs text-muted-foreground">صديق</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-semibold">{postCount}</span>
-                  <span className="text-muted-foreground">منشور</span>
+                <div className="glass rounded-xl px-4 py-2 text-center">
+                  <span className="font-bold text-lg block">{postCount}</span>
+                  <span className="text-xs text-muted-foreground">منشور</span>
                 </div>
               </div>
 
@@ -559,23 +562,26 @@ export default function ProfilePage() {
           </div>
 
           {/* Tabs */}
-          <Tabs defaultValue="posts" className="mt-6">
-            <TabsList className="w-full justify-start flex-wrap">
-              <TabsTrigger value="posts">المنشورات</TabsTrigger>
-              <TabsTrigger value="about">حول</TabsTrigger>
-              <TabsTrigger value="friends">الأصدقاء</TabsTrigger>
-              <TabsTrigger value="photos">الصور</TabsTrigger>
+          <Tabs defaultValue="posts" className="mt-8">
+            <TabsList className="w-full justify-start flex-wrap bg-muted/60 rounded-xl h-11 gap-0">
+              <TabsTrigger value="posts" className="rounded-lg font-semibold data-[state=active]:shadow-card">المنشورات</TabsTrigger>
+              <TabsTrigger value="about" className="rounded-lg font-semibold data-[state=active]:shadow-card">حول</TabsTrigger>
+              <TabsTrigger value="friends" className="rounded-lg font-semibold data-[state=active]:shadow-card">الأصدقاء</TabsTrigger>
+              <TabsTrigger value="photos" className="rounded-lg font-semibold data-[state=active]:shadow-card">الصور</TabsTrigger>
               {isOwnProfile && (
-                <TabsTrigger value="saved">
+                <TabsTrigger value="saved" className="rounded-lg font-semibold data-[state=active]:shadow-card">
                   <Bookmark className="h-4 w-4 ml-1" />
                   المحفوظات
                 </TabsTrigger>
               )}
             </TabsList>
 
-            <TabsContent value="posts" className="mt-4 space-y-4">
+            <TabsContent value="posts" className="mt-5 space-y-4">
               {sortedPosts.length === 0 ? (
-                <Card className="p-8 text-center text-muted-foreground">لا توجد منشورات بعد</Card>
+                <Card className="glass rounded-2xl p-12 text-center border-border/50">
+                  <ImageIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+                  <p className="text-muted-foreground font-medium">لا توجد منشورات بعد</p>
+                </Card>
               ) : (
                 sortedPosts.map((post) => (
                   <div key={post.id} className="relative">
@@ -602,51 +608,63 @@ export default function ProfilePage() {
               )}
             </TabsContent>
 
-            <TabsContent value="about" className="mt-4">
-              <Card className="p-6">
-                <h3 className="font-semibold mb-4">معلومات عامة</h3>
-                <div className="space-y-3 text-sm">
-                  <p><span className="text-muted-foreground">اسم المستخدم:</span> @{profile.username}</p>
+            <TabsContent value="about" className="mt-5">
+              <Card className="glass rounded-2xl p-6 border-border/50">
+                <h3 className="font-semibold mb-5 text-lg">معلومات عامة</h3>
+                <div className="space-y-4 text-sm">
+                  <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
+                    <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div><span className="text-muted-foreground text-xs block">اسم المستخدم</span><span className="font-medium">@{profile.username}</span></div>
+                  </div>
                   {profile.full_name && (
-                    <p><span className="text-muted-foreground">الاسم الكامل:</span> {profile.full_name}</p>
+                    <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
+                      <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div><span className="text-muted-foreground text-xs block">الاسم الكامل</span><span className="font-medium">{profile.full_name}</span></div>
+                    </div>
                   )}
                   {profile.bio && (
-                    <p><span className="text-muted-foreground">نبذة:</span> {profile.bio}</p>
+                    <div className="p-3 bg-muted/40 rounded-xl">
+                      <span className="text-muted-foreground text-xs block mb-1">نبذة</span>
+                      <p className="leading-relaxed">{profile.bio}</p>
+                    </div>
                   )}
                   {(profile as any).link_url && (
-                    <p>
-                      <span className="text-muted-foreground">الرابط:</span>{' '}
-                      <a href={(profile as any).link_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                        {(profile as any).link_url}
-                      </a>
-                    </p>
+                    <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
+                      <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div><span className="text-muted-foreground text-xs block">الرابط</span>
+                        <a href={(profile as any).link_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">{(profile as any).link_url}</a>
+                      </div>
+                    </div>
                   )}
-                  <p>
-                    <span className="text-muted-foreground">تاريخ الانضمام:</span>{' '}
-                    {new Date(profile.created_at).toLocaleDateString('ar-EG')}
-                  </p>
+                  <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
+                    <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div><span className="text-muted-foreground text-xs block">تاريخ الانضمام</span><span className="font-medium">{new Date(profile.created_at).toLocaleDateString('ar-EG')}</span></div>
+                  </div>
                 </div>
               </Card>
             </TabsContent>
 
-            <TabsContent value="friends" className="mt-4">
+            <TabsContent value="friends" className="mt-5">
               {friends.length === 0 ? (
-                <Card className="p-8 text-center text-muted-foreground">لا يوجد أصدقاء بعد</Card>
+                <Card className="glass rounded-2xl p-12 text-center border-border/50">
+                  <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+                  <p className="text-muted-foreground font-medium">لا يوجد أصدقاء بعد</p>
+                </Card>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {friends.map((friend) => (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {friends.map((friend, i) => (
                     <Link key={friend.id} to={`/profile/${friend.id}`}>
-                      <Card className="p-4 hover:bg-muted transition-colors">
-                        <div className="flex flex-col items-center text-center gap-2">
+                      <Card className="glass rounded-2xl p-5 border-border/50 hover-lift transition-all animate-fade-in" style={{ animationDelay: `${i * 0.03}s` }}>
+                        <div className="flex flex-col items-center text-center gap-3">
                           <div className="relative">
-                            <Avatar className="h-16 w-16">
+                            <Avatar className="h-16 w-16 ring-2 ring-border">
                               <AvatarImage src={friend.avatar_url || ''} />
-                              <AvatarFallback className="bg-primary text-primary-foreground">
+                              <AvatarFallback className="gradient-primary text-primary-foreground font-bold">
                                 {friend.username.charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             {(friend as any).is_online && (
-                              <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />
+                              <div className="absolute bottom-0 right-0 w-4 h-4 bg-online rounded-full border-2 border-background" />
                             )}
                           </div>
                           <div>
@@ -661,22 +679,25 @@ export default function ProfilePage() {
               )}
             </TabsContent>
 
-            <TabsContent value="photos" className="mt-4">
+            <TabsContent value="photos" className="mt-5">
               {photos.length === 0 ? (
-                <Card className="p-8 text-center text-muted-foreground">لا توجد صور بعد</Card>
+                <Card className="glass rounded-2xl p-12 text-center border-border/50">
+                  <ImageIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+                  <p className="text-muted-foreground font-medium">لا توجد صور بعد</p>
+                </Card>
               ) : (
                 <>
                   <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
                     {photos.map((photo, index) => (
-                      <div key={index} className="aspect-square cursor-pointer overflow-hidden rounded-lg hover:opacity-90 transition-opacity"
+                      <div key={index} className="aspect-square cursor-pointer overflow-hidden rounded-xl hover:opacity-80 hover:scale-[1.02] transition-all"
                         onClick={() => setSelectedPhoto(photo)}>
                         <img src={photo} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
                       </div>
                     ))}
                   </div>
                   <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
-                    <DialogContent className="sm:max-w-4xl bg-black/90 border-0 p-0">
-                      <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white hover:bg-white/20 z-10" onClick={() => setSelectedPhoto(null)}>
+                    <DialogContent className="sm:max-w-4xl bg-black/90 border-0 p-0 rounded-2xl">
+                      <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white hover:bg-white/20 z-10 rounded-xl" onClick={() => setSelectedPhoto(null)}>
                         <X className="h-6 w-6" />
                       </Button>
                       <div className="flex items-center justify-center min-h-[60vh]">
@@ -689,12 +710,12 @@ export default function ProfilePage() {
             </TabsContent>
 
             {isOwnProfile && (
-              <TabsContent value="saved" className="mt-4 space-y-4">
+              <TabsContent value="saved" className="mt-5 space-y-4">
                 {savedPosts.length === 0 ? (
-                  <Card className="p-8 text-center text-muted-foreground">
-                    <Bookmark className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>لا توجد منشورات محفوظة</p>
-                    <p className="text-sm mt-1">احفظ المنشورات التي تعجبك لتجدها هنا</p>
+                  <Card className="glass rounded-2xl p-12 text-center border-border/50">
+                    <Bookmark className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+                    <p className="text-muted-foreground font-medium">لا توجد منشورات محفوظة</p>
+                    <p className="text-sm text-muted-foreground mt-1">احفظ المنشورات التي تعجبك لتجدها هنا</p>
                   </Card>
                 ) : (
                   savedPosts.map((saved) => (

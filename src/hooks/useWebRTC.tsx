@@ -43,7 +43,7 @@ export function useWebRTC({ currentUser, friend, callType, onCallEnded }: UseWeb
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const callTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const callTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const signalChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const isInitiatorRef = useRef(false);
