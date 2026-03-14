@@ -344,7 +344,7 @@ export default function SearchPage() {
                   </Card>
                 ))}
                 {results.hashtags.length === 0 && hasQuery && (
-                  <p className="text-center text-muted-foreground py-8">لا توجد هاشتاقات مطابقة</p>
+                  <p className="text-center text-muted-foreground py-8">{t('search.noHashtags')}</p>
                 )}
               </TabsContent>
             </>
