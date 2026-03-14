@@ -178,9 +178,9 @@ export default function FriendsPage() {
                       </Link>
                       <div className="flex-1 min-w-0">
                         <Link to={`/profile/${request.addressee?.id}`} className="font-semibold hover:text-primary transition-colors block truncate">{request.addressee?.full_name || request.addressee?.username}</Link>
-                        <p className="text-sm text-muted-foreground">في انتظار الموافقة</p>
+                        <p className="text-sm text-muted-foreground">{t('friends.pendingApproval')}</p>
                       </div>
-                      <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => cancelRequest(request.id)}>إلغاء الطلب</Button>
+                      <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => cancelRequest(request.id)}>{t('friends.cancelRequest')}</Button>
                     </div>
                   </Card>
                 ))}
