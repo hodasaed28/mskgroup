@@ -55,7 +55,7 @@ export default function NotificationsPage() {
         p_reference_id: notification.reference_id,
       });
       await supabase.from('notifications').update({ is_read: true }).eq('id', notification.id);
-      toast({ title: accept ? 'تم قبول الطلب' : 'تم رفض الطلب' });
+      toast({ title: accept ? t('friends.requestAccepted') : t('friends.requestRejected') });
       fetchNotifications(); refreshNotifications();
     }
   };
