@@ -33,7 +33,21 @@
     "loginSuccess": "تم تسجيل الدخول بنجاح",
     "dataError": "خطأ في البيانات",
     "error": "خطأ",
-    "selectCountry": "اختر الدولة"
+    "selectCountry": "اختر الدولة",
+    "welcome": "مرحباً بك",
+    "subtitle": "تواصل مع أصدقائك وعائلتك من جميع أنحاء العالم",
+    "forgotPassword": "نسيت كلمة المرور؟",
+    "register": "حساب جديد",
+    "or": "أو",
+    "googleSignIn": "تسجيل الدخول عبر Google",
+    "feature1Title": "أصدقاء جدد",
+    "feature1Desc": "تعرف على أشخاص جدد من حول العالم",
+    "feature2Title": "دردشة فورية",
+    "feature2Desc": "تحدث مع أصدقائك في الوقت الحقيقي",
+    "feature3Title": "إعجابات",
+    "feature3Desc": "أظهر دعمك وتقديرك للآخرين",
+    "feature4Title": "مشاركة",
+    "feature4Desc": "شارك لحظاتك المميزة مع الجميع"
   },
   "nav": {
     "home": "الرئيسية",
