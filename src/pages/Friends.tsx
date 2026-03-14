@@ -61,7 +61,7 @@ export default function FriendsPage() {
     if (!user) return;
     const { error } = await supabase.from('friendships').delete()
       .or(`and(requester_id.eq.${user.id},addressee_id.eq.${friendId}),and(requester_id.eq.${friendId},addressee_id.eq.${user.id})`);
-    if (!error) { toast({ title: 'تم إزالة الصديق' }); fetchFriends(); }
+    if (!error) { toast({ title: t('friends.friendRemoved') }); fetchFriends(); }
   };
 
   if (authLoading || loading) {
