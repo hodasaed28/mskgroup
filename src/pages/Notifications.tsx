@@ -130,7 +130,7 @@ export default function NotificationsPage() {
                           <Check className="h-3.5 w-3.5 ml-1" />{t('notifications.accept')}
                         </Button>
                         <Button size="sm" variant="outline" className="rounded-xl border-border/50" onClick={() => handleFriendRequestAction(notification, false)}>
-                          <X className="h-3.5 w-3.5 ml-1" />رفض
+                          <X className="h-3.5 w-3.5 ml-1" />{t('notifications.reject')}
                         </Button>
                       </div>
                     )}
