@@ -12,11 +12,15 @@ import { useToast } from '@/hooks/use-toast';
 import { Check, X, UserMinus, Loader2, Users, UserPlus, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useChatContext } from '@/contexts/ChatContext';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export default function FriendsPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
   const { profile, notificationCount, messageCount, toggleChat } = useChatContext();
   const [friends, setFriends] = useState<Profile[]>([]);
   const [requests, setRequests] = useState<Friendship[]>([]);
@@ -45,19 +49,19 @@ export default function FriendsPage() {
 
   const handleRequest = async (friendshipId: string, accept: boolean) => {
     const { error } = await supabase.from('friendships').update({ status: accept ? 'accepted' : 'rejected' }).eq('id', friendshipId);
-    if (!error) { toast({ title: accept ? 'تم قبول الطلب' : 'تم رفض الطلب' }); fetchRequests(); if (accept) fetchFriends(); }
+    if (!error) { toast({ title: accept ? t('friends.requestAccepted') : t('friends.requestRejected') }); fetchRequests(); if (accept) fetchFriends(); }
   };
 
   const cancelRequest = async (friendshipId: string) => {
     const { error } = await supabase.from('friendships').delete().eq('id', friendshipId);
-    if (!error) { toast({ title: 'تم إلغاء الطلب' }); fetchRequests(); }
+    if (!error) { toast({ title: t('friends.requestCanceled') }); fetchRequests(); }
   };
 
   const removeFriend = async (friendId: string) => {
     if (!user) return;
     const { error } = await supabase.from('friendships').delete()
       .or(`and(requester_id.eq.${user.id},addressee_id.eq.${friendId}),and(requester_id.eq.${friendId},addressee_id.eq.${user.id})`);
-    if (!error) { toast({ title: 'تم إزالة الصديق' }); fetchFriends(); }
+    if (!error) { toast({ title: t('friends.friendRemoved') }); fetchFriends(); }
   };
 
   if (authLoading || loading) {
@@ -67,24 +71,24 @@ export default function FriendsPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header profile={profile} notificationCount={notificationCount} messageCount={messageCount} onMessagesClick={toggleChat} />
-      <div className="container mx-auto px-4 py-6 max-w-4xl" dir="rtl">
+      <div className="container mx-auto px-4 py-6 max-w-4xl" dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center shadow-glow">
             <Users className="h-5 w-5 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold">الأصدقاء</h1>
+          <h1 className="text-2xl font-bold">{t('friends.title')}</h1>
         </div>
 
         <Tabs defaultValue="friends">
           <TabsList className="bg-muted/60 rounded-xl h-11 mb-6">
             <TabsTrigger value="friends" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
-              <Users className="h-4 w-4" />أصدقائي ({friends.length})
+              <Users className="h-4 w-4" />{t('friends.myFriends')} ({friends.length})
             </TabsTrigger>
             <TabsTrigger value="requests" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
-              <UserPlus className="h-4 w-4" />طلبات الصداقة ({requests.length})
+              <UserPlus className="h-4 w-4" />{t('friends.friendRequests')} ({requests.length})
             </TabsTrigger>
             <TabsTrigger value="sent" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
-              <Clock className="h-4 w-4" />المرسلة ({sentRequests.length})
+              <Clock className="h-4 w-4" />{t('friends.sent')} ({sentRequests.length})
             </TabsTrigger>
           </TabsList>
 
@@ -92,7 +96,7 @@ export default function FriendsPage() {
             {friends.length === 0 ? (
               <Card className="glass rounded-2xl p-12 text-center border-border/50">
                 <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-                <p className="text-muted-foreground">لا يوجد أصدقاء بعد</p>
+                <p className="text-muted-foreground">{t('friends.noFriends')}</p>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -110,7 +114,7 @@ export default function FriendsPage() {
                         <p className="text-sm text-muted-foreground">@{friend.username}</p>
                       </div>
                       <Button variant="outline" size="sm" className="rounded-xl border-border/50 hover:border-destructive/30 hover:text-destructive hover:bg-destructive/5 transition-all" onClick={() => removeFriend(friend.id)}>
-                        <UserMinus className="h-4 w-4 ml-2" />إزالة
+                        <UserMinus className="h-4 w-4 ml-2" />{t('friends.remove')}
                       </Button>
                     </div>
                   </Card>
@@ -123,7 +127,7 @@ export default function FriendsPage() {
             {requests.length === 0 ? (
               <Card className="glass rounded-2xl p-12 text-center border-border/50">
                 <UserPlus className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-                <p className="text-muted-foreground">لا توجد طلبات صداقة</p>
+                <p className="text-muted-foreground">{t('friends.noRequests')}</p>
               </Card>
             ) : (
               <div className="space-y-4">
@@ -138,14 +142,14 @@ export default function FriendsPage() {
                       </Link>
                       <div className="flex-1 min-w-0">
                         <Link to={`/profile/${request.requester?.id}`} className="font-semibold hover:text-primary transition-colors block truncate">{request.requester?.full_name || request.requester?.username}</Link>
-                        <p className="text-sm text-muted-foreground">يريد إضافتك كصديق</p>
+                        <p className="text-sm text-muted-foreground">{t('friends.wantsToAdd')}</p>
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" className="rounded-xl gradient-primary text-primary-foreground shadow-glow" onClick={() => handleRequest(request.id, true)}>
-                          <Check className="h-4 w-4 ml-1" />قبول
+                          <Check className="h-4 w-4 ml-1" />{t('friends.accept')}
                         </Button>
                         <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => handleRequest(request.id, false)}>
-                          <X className="h-4 w-4 ml-1" />رفض
+                          <X className="h-4 w-4 ml-1" />{t('friends.reject')}
                         </Button>
                       </div>
                     </div>
@@ -159,7 +163,7 @@ export default function FriendsPage() {
             {sentRequests.length === 0 ? (
               <Card className="glass rounded-2xl p-12 text-center border-border/50">
                 <Clock className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-                <p className="text-muted-foreground">لا توجد طلبات مرسلة</p>
+                <p className="text-muted-foreground">{t('friends.noSentRequests')}</p>
               </Card>
             ) : (
               <div className="space-y-4">
@@ -174,9 +178,9 @@ export default function FriendsPage() {
                       </Link>
                       <div className="flex-1 min-w-0">
                         <Link to={`/profile/${request.addressee?.id}`} className="font-semibold hover:text-primary transition-colors block truncate">{request.addressee?.full_name || request.addressee?.username}</Link>
-                        <p className="text-sm text-muted-foreground">في انتظار الموافقة</p>
+                        <p className="text-sm text-muted-foreground">{t('friends.pendingApproval')}</p>
                       </div>
-                      <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => cancelRequest(request.id)}>إلغاء الطلب</Button>
+                      <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => cancelRequest(request.id)}>{t('friends.cancelRequest')}</Button>
                     </div>
                   </Card>
                 ))}

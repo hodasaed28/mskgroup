@@ -8,17 +8,24 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, UserPlus, Bell, Loader2, Check, X, UserCheck, UserX } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { ar, enUS, fr, tr } from 'date-fns/locale';
+import type { Locale } from 'date-fns';
 import { useChatContext } from '@/contexts/ChatContext';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export default function NotificationsPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
   const { profile, notificationCount, messageCount, toggleChat, refreshNotifications } = useChatContext();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const dateLocaleMap: Record<string, Locale> = { ar, en: enUS, fr, tr };
+  const dateLang = dateLocaleMap[t('app.name') ? 'ar' : 'en'] || ar;
 
   useEffect(() => { if (!authLoading && !user) navigate('/auth'); }, [user, authLoading, navigate]);
   useEffect(() => { if (user) fetchNotifications(); }, [user]);
@@ -49,7 +56,7 @@ export default function NotificationsPage() {
         p_reference_id: notification.reference_id,
       });
       await supabase.from('notifications').update({ is_read: true }).eq('id', notification.id);
-      toast({ title: accept ? 'تم قبول الطلب' : 'تم رفض الطلب' });
+      toast({ title: accept ? t('friends.requestAccepted') : t('friends.requestRejected') });
       fetchNotifications(); refreshNotifications();
     }
   };
@@ -80,26 +87,26 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header profile={profile} notificationCount={notificationCount} messageCount={messageCount} onMessagesClick={toggleChat} />
-      <div className="container mx-auto px-4 py-6 max-w-2xl" dir="rtl">
+      <div className="container mx-auto px-4 py-6 max-w-2xl" dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center shadow-glow">
               <Bell className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">الإشعارات</h1>
-              {unreadCount > 0 && <p className="text-xs text-muted-foreground">{unreadCount} غير مقروءة</p>}
+              <h1 className="text-2xl font-bold">{t('notifications.title')}</h1>
+              {unreadCount > 0 && <p className="text-xs text-muted-foreground">{unreadCount} {t('notifications.unread')}</p>}
             </div>
           </div>
           {unreadCount > 0 && (
-            <Button variant="outline" size="sm" onClick={markAllAsRead} className="rounded-xl border-border/50">تحديد الكل كمقروء</Button>
+            <Button variant="outline" size="sm" onClick={markAllAsRead} className="rounded-xl border-border/50">{t('notifications.markAllRead')}</Button>
           )}
         </div>
 
         {notifications.length === 0 ? (
           <Card className="glass rounded-2xl p-12 text-center border-border/50">
             <Bell className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
-            <p className="text-muted-foreground font-medium">لا توجد إشعارات</p>
+            <p className="text-muted-foreground font-medium">{t('notifications.empty')}</p>
           </Card>
         ) : (
           <div className="space-y-2">
@@ -121,15 +128,15 @@ export default function NotificationsPage() {
                     {notification.type === 'friend_request' && !notification.is_read && (
                       <div className="flex gap-2 mt-3">
                         <Button size="sm" className="rounded-xl gradient-primary text-primary-foreground shadow-glow" onClick={() => handleFriendRequestAction(notification, true)}>
-                          <Check className="h-3.5 w-3.5 ml-1" />قبول
+                          <Check className="h-3.5 w-3.5 ml-1" />{t('notifications.accept')}
                         </Button>
                         <Button size="sm" variant="outline" className="rounded-xl border-border/50" onClick={() => handleFriendRequestAction(notification, false)}>
-                          <X className="h-3.5 w-3.5 ml-1" />رفض
+                          <X className="h-3.5 w-3.5 ml-1" />{t('notifications.reject')}
                         </Button>
                       </div>
                     )}
                     {notification.type === 'friend_rejected' && (
-                      <p className="text-xs text-muted-foreground mt-2">يمكنك إرسال طلب صداقة جديد من صفحة الملف الشخصي</p>
+                      <p className="text-xs text-muted-foreground mt-2">{t('notifications.canSendNewRequest')}</p>
                     )}
                   </div>
                   {!notification.is_read && <div className="w-2.5 h-2.5 gradient-primary rounded-full mt-1 shadow-glow flex-shrink-0" />}

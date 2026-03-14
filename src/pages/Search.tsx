@@ -162,7 +162,7 @@ export default function SearchPage() {
           <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center shadow-glow">
             <Search className="h-5 w-5 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold">البحث</h1>
+          <h1 className="text-2xl font-bold">{t('search.title')}</h1>
         </div>
 
         {/* Search Input */}
@@ -171,7 +171,7 @@ export default function SearchPage() {
             <Search className={`absolute top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-colors group-focus-within:text-primary ${isRTL ? 'right-4' : 'left-4'}`} />
             <Input
               ref={inputRef}
-              placeholder="ابحث عن أشخاص، منشورات، هاشتاقات..."
+              placeholder={t('search.placeholder')}
               className={`h-12 text-base rounded-xl bg-muted/60 border-0 focus:bg-card focus:shadow-card transition-all ${isRTL ? 'pr-12' : 'pl-12'}`}
               value={query}
               onChange={(e) => handleInputChange(e.target.value)}
@@ -185,7 +185,7 @@ export default function SearchPage() {
               {suggestions.length > 0 && (
                 <div className="p-2 border-b border-border/50">
                   <p className="text-xs text-muted-foreground px-3 py-1.5 flex items-center gap-1.5 font-medium">
-                    <TrendingUp className="h-3 w-3" /> اقتراحات
+                    <TrendingUp className="h-3 w-3" /> {t('search.suggestions')}
                   </p>
                   {suggestions.map((s, i) => (
                     <button key={i} onClick={() => handleSelectSuggestion(s)}
@@ -199,9 +199,9 @@ export default function SearchPage() {
                 <div className="p-2">
                   <div className="flex items-center justify-between px-3 py-1.5">
                     <p className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
-                      <Clock className="h-3 w-3" /> عمليات البحث الأخيرة
+                      <Clock className="h-3 w-3" /> {t('search.recentSearches')}
                     </p>
-                    <button onClick={clearAllRecentSearches} className="text-xs text-destructive hover:underline font-medium">مسح الكل</button>
+                    <button onClick={clearAllRecentSearches} className="text-xs text-destructive hover:underline font-medium">{t('search.clearAll')}</button>
                   </div>
                   {recentSearches.map((s, i) => (
                     <div key={i} className="flex items-center justify-between px-3 py-2.5 hover:bg-muted/80 rounded-lg transition-colors">
@@ -222,15 +222,15 @@ export default function SearchPage() {
           <TabsList className="grid w-full grid-cols-3 mb-6 bg-muted/60 rounded-xl h-11">
             <TabsTrigger value="people" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
               <Users className="h-4 w-4" />
-              أشخاص ({results.people.length})
+              {t('search.people')} ({results.people.length})
             </TabsTrigger>
             <TabsTrigger value="posts" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
               <FileText className="h-4 w-4" />
-              منشورات ({results.posts.length})
+              {t('search.posts')} ({results.posts.length})
             </TabsTrigger>
             <TabsTrigger value="hashtags" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
               <Hash className="h-4 w-4" />
-              هاشتاقات ({results.hashtags.length})
+              {t('search.hashtags')} ({results.hashtags.length})
             </TabsTrigger>
           </TabsList>
 
@@ -238,20 +238,20 @@ export default function SearchPage() {
             <div className="flex justify-center py-16">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">جاري البحث...</p>
+                <p className="text-sm text-muted-foreground">{t('search.searching')}</p>
               </div>
             </div>
           ) : totalResults === 0 && hasQuery ? (
             <Card className="glass rounded-2xl p-12 text-center border-border/50">
               <Search className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
-              <p className="text-muted-foreground font-medium">لا توجد نتائج لـ "{searchParams.get('q')}"</p>
-              <p className="text-sm text-muted-foreground mt-1">جرب كلمات بحث مختلفة</p>
+              <p className="text-muted-foreground font-medium">{t('search.noResults')} "{searchParams.get('q')}"</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('search.tryDifferent')}</p>
             </Card>
           ) : !hasQuery ? (
             <Card className="glass rounded-2xl p-12 text-center border-border/50">
               <Sparkles className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
-              <p className="text-muted-foreground font-medium">ابحث عن أصدقاء، منشورات، وهاشتاقات</p>
-              <p className="text-sm text-muted-foreground mt-1">اكتب في حقل البحث أعلاه للبدء</p>
+              <p className="text-muted-foreground font-medium">{t('search.emptyTitle')}</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('search.emptySubtitle')}</p>
             </Card>
           ) : (
             <>
@@ -276,13 +276,13 @@ export default function SearchPage() {
                       </div>
                       <Button size="sm" className="rounded-xl gradient-primary text-primary-foreground shadow-glow" onClick={() => sendFriendRequest(person.id)}>
                         <UserPlus className="h-4 w-4 ml-1" />
-                        إضافة
+                        {t('search.add')}
                       </Button>
                     </div>
                   </Card>
                 ))}
                 {results.people.length === 0 && hasQuery && (
-                  <p className="text-center text-muted-foreground py-8">لا يوجد أشخاص بهذا الاسم</p>
+                  <p className="text-center text-muted-foreground py-8">{t('search.noPeople')}</p>
                 )}
               </TabsContent>
 
@@ -322,7 +322,7 @@ export default function SearchPage() {
                   </Link>
                 ))}
                 {results.posts.length === 0 && hasQuery && (
-                  <p className="text-center text-muted-foreground py-8">لا توجد منشورات مطابقة</p>
+                  <p className="text-center text-muted-foreground py-8">{t('search.noPosts')}</p>
                 )}
               </TabsContent>
 
@@ -335,16 +335,16 @@ export default function SearchPage() {
                       </div>
                       <div className="flex-1">
                         <p className="font-bold text-primary">#{hashtag.name}</p>
-                        <p className="text-sm text-muted-foreground">{hashtag.post_count} منشور</p>
+                        <p className="text-sm text-muted-foreground">{hashtag.post_count} {t('search.postCount')}</p>
                       </div>
                       <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => handleSelectSuggestion(`#${hashtag.name}`)}>
-                        عرض
+                        {t('search.view')}
                       </Button>
                     </div>
                   </Card>
                 ))}
                 {results.hashtags.length === 0 && hasQuery && (
-                  <p className="text-center text-muted-foreground py-8">لا توجد هاشتاقات مطابقة</p>
+                  <p className="text-center text-muted-foreground py-8">{t('search.noHashtags')}</p>
                 )}
               </TabsContent>
             </>
