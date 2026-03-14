@@ -282,7 +282,7 @@ export default function SearchPage() {
                   </Card>
                 ))}
                 {results.people.length === 0 && hasQuery && (
-                  <p className="text-center text-muted-foreground py-8">لا يوجد أشخاص بهذا الاسم</p>
+                  <p className="text-center text-muted-foreground py-8">{t('search.noPeople')}</p>
                 )}
               </TabsContent>
 
