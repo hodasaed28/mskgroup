@@ -162,7 +162,7 @@ export default function SearchPage() {
           <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center shadow-glow">
             <Search className="h-5 w-5 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold">البحث</h1>
+          <h1 className="text-2xl font-bold">{t('search.title')}</h1>
         </div>
 
         {/* Search Input */}
