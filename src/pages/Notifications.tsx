@@ -135,7 +135,7 @@ export default function NotificationsPage() {
                       </div>
                     )}
                     {notification.type === 'friend_rejected' && (
-                      <p className="text-xs text-muted-foreground mt-2">يمكنك إرسال طلب صداقة جديد من صفحة الملف الشخصي</p>
+                      <p className="text-xs text-muted-foreground mt-2">{t('notifications.canSendNewRequest')}</p>
                     )}
                   </div>
                   {!notification.is_read && <div className="w-2.5 h-2.5 gradient-primary rounded-full mt-1 shadow-glow flex-shrink-0" />}
