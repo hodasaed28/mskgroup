@@ -199,9 +199,9 @@ export default function SearchPage() {
                 <div className="p-2">
                   <div className="flex items-center justify-between px-3 py-1.5">
                     <p className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
-                      <Clock className="h-3 w-3" /> عمليات البحث الأخيرة
+                      <Clock className="h-3 w-3" /> {t('search.recentSearches')}
                     </p>
-                    <button onClick={clearAllRecentSearches} className="text-xs text-destructive hover:underline font-medium">مسح الكل</button>
+                    <button onClick={clearAllRecentSearches} className="text-xs text-destructive hover:underline font-medium">{t('search.clearAll')}</button>
                   </div>
                   {recentSearches.map((s, i) => (
                     <div key={i} className="flex items-center justify-between px-3 py-2.5 hover:bg-muted/80 rounded-lg transition-colors">
