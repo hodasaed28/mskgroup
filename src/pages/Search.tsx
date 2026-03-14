@@ -244,8 +244,8 @@ export default function SearchPage() {
           ) : totalResults === 0 && hasQuery ? (
             <Card className="glass rounded-2xl p-12 text-center border-border/50">
               <Search className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
-              <p className="text-muted-foreground font-medium">لا توجد نتائج لـ "{searchParams.get('q')}"</p>
-              <p className="text-sm text-muted-foreground mt-1">جرب كلمات بحث مختلفة</p>
+              <p className="text-muted-foreground font-medium">{t('search.noResults')} "{searchParams.get('q')}"</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('search.tryDifferent')}</p>
             </Card>
           ) : !hasQuery ? (
             <Card className="glass rounded-2xl p-12 text-center border-border/50">
