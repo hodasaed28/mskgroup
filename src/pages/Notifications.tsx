@@ -93,8 +93,8 @@ export default function NotificationsPage() {
               <Bell className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">الإشعارات</h1>
-              {unreadCount > 0 && <p className="text-xs text-muted-foreground">{unreadCount} غير مقروءة</p>}
+              <h1 className="text-2xl font-bold">{t('notifications.title')}</h1>
+              {unreadCount > 0 && <p className="text-xs text-muted-foreground">{unreadCount} {t('notifications.unread')}</p>}
             </div>
           </div>
           {unreadCount > 0 && (
