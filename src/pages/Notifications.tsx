@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, UserPlus, Bell, Loader2, Check, X, UserCheck, UserX } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ar, enUS, fr, tr } from 'date-fns/locale';
+import type { Locale } from 'date-fns';
 import { useChatContext } from '@/contexts/ChatContext';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
