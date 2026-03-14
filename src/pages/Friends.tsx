@@ -12,6 +12,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Check, X, UserMinus, Loader2, Users, UserPlus, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useChatContext } from '@/contexts/ChatContext';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export default function FriendsPage() {
   const { user, loading: authLoading } = useAuth();
