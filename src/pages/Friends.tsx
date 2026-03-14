@@ -96,7 +96,7 @@ export default function FriendsPage() {
             {friends.length === 0 ? (
               <Card className="glass rounded-2xl p-12 text-center border-border/50">
                 <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-                <p className="text-muted-foreground">لا يوجد أصدقاء بعد</p>
+                <p className="text-muted-foreground">{t('friends.noFriends')}</p>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
