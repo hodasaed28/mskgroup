@@ -105,7 +105,7 @@ export default function NotificationsPage() {
         {notifications.length === 0 ? (
           <Card className="glass rounded-2xl p-12 text-center border-border/50">
             <Bell className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
-            <p className="text-muted-foreground font-medium">لا توجد إشعارات</p>
+            <p className="text-muted-foreground font-medium">{t('notifications.empty')}</p>
           </Card>
         ) : (
           <div className="space-y-2">
