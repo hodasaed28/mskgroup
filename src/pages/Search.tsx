@@ -171,7 +171,7 @@ export default function SearchPage() {
             <Search className={`absolute top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-colors group-focus-within:text-primary ${isRTL ? 'right-4' : 'left-4'}`} />
             <Input
               ref={inputRef}
-              placeholder="ابحث عن أشخاص، منشورات، هاشتاقات..."
+              placeholder={t('search.placeholder')}
               className={`h-12 text-base rounded-xl bg-muted/60 border-0 focus:bg-card focus:shadow-card transition-all ${isRTL ? 'pr-12' : 'pl-12'}`}
               value={query}
               onChange={(e) => handleInputChange(e.target.value)}
