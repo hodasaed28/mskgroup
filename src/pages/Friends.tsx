@@ -49,7 +49,7 @@ export default function FriendsPage() {
 
   const handleRequest = async (friendshipId: string, accept: boolean) => {
     const { error } = await supabase.from('friendships').update({ status: accept ? 'accepted' : 'rejected' }).eq('id', friendshipId);
-    if (!error) { toast({ title: accept ? 'تم قبول الطلب' : 'تم رفض الطلب' }); fetchRequests(); if (accept) fetchFriends(); }
+    if (!error) { toast({ title: accept ? t('friends.requestAccepted') : t('friends.requestRejected') }); fetchRequests(); if (accept) fetchFriends(); }
   };
 
   const cancelRequest = async (friendshipId: string) => {
