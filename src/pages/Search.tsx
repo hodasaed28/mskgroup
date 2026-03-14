@@ -322,7 +322,7 @@ export default function SearchPage() {
                   </Link>
                 ))}
                 {results.posts.length === 0 && hasQuery && (
-                  <p className="text-center text-muted-foreground py-8">لا توجد منشورات مطابقة</p>
+                  <p className="text-center text-muted-foreground py-8">{t('search.noPosts')}</p>
                 )}
               </TabsContent>
 
