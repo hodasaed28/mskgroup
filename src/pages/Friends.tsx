@@ -82,10 +82,10 @@ export default function FriendsPage() {
         <Tabs defaultValue="friends">
           <TabsList className="bg-muted/60 rounded-xl h-11 mb-6">
             <TabsTrigger value="friends" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
-              <Users className="h-4 w-4" />أصدقائي ({friends.length})
+              <Users className="h-4 w-4" />{t('friends.myFriends')} ({friends.length})
             </TabsTrigger>
             <TabsTrigger value="requests" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
-              <UserPlus className="h-4 w-4" />طلبات الصداقة ({requests.length})
+              <UserPlus className="h-4 w-4" />{t('friends.friendRequests')} ({requests.length})
             </TabsTrigger>
             <TabsTrigger value="sent" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
               <Clock className="h-4 w-4" />المرسلة ({sentRequests.length})
