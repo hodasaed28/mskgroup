@@ -185,7 +185,7 @@ export default function SearchPage() {
               {suggestions.length > 0 && (
                 <div className="p-2 border-b border-border/50">
                   <p className="text-xs text-muted-foreground px-3 py-1.5 flex items-center gap-1.5 font-medium">
-                    <TrendingUp className="h-3 w-3" /> اقتراحات
+                    <TrendingUp className="h-3 w-3" /> {t('search.suggestions')}
                   </p>
                   {suggestions.map((s, i) => (
                     <button key={i} onClick={() => handleSelectSuggestion(s)}
