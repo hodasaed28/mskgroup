@@ -33,7 +33,21 @@
     "loginSuccess": "Başarıyla giriş yapıldı",
     "dataError": "Veri hatası",
     "error": "Hata",
-    "selectCountry": "Ülke seçin"
+    "selectCountry": "Ülke seçin",
+    "welcome": "Hoş Geldiniz",
+    "subtitle": "Dünyanın her yerindeki arkadaşlarınız ve ailenizle bağlantı kurun",
+    "forgotPassword": "Şifremi unuttum?",
+    "register": "Kayıt Ol",
+    "or": "Veya",
+    "googleSignIn": "Google ile giriş yap",
+    "feature1Title": "Yeni Arkadaşlar",
+    "feature1Desc": "Dünyanın her yerinden yeni insanlarla tanışın",
+    "feature2Title": "Anlık Sohbet",
+    "feature2Desc": "Arkadaşlarınızla gerçek zamanlı konuşun",
+    "feature3Title": "Beğeniler",
+    "feature3Desc": "Desteğinizi ve takdirinizi gösterin",
+    "feature4Title": "Paylaş",
+    "feature4Desc": "Özel anlarınızı herkesle paylaşın"
   },
   "nav": {
     "home": "Ana Sayfa",
@@ -100,6 +114,7 @@
     "success": "Başarılı",
     "bio": "Biyografi",
     "bioPlaceholder": "Kendiniz hakkında kısa bir biyografi yazın...",
-    "areYouSure": "Emin misiniz?"
+    "areYouSure": "Emin misiniz?",
+    "back": "Geri"
   }
 }

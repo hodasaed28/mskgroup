@@ -33,7 +33,21 @@
     "loginSuccess": "Logged in successfully",
     "dataError": "Data error",
     "error": "Error",
-    "selectCountry": "Select country"
+    "selectCountry": "Select country",
+    "welcome": "Welcome",
+    "subtitle": "Connect with your friends and family from all over the world",
+    "forgotPassword": "Forgot password?",
+    "register": "Register",
+    "or": "Or",
+    "googleSignIn": "Sign in with Google",
+    "feature1Title": "New Friends",
+    "feature1Desc": "Meet new people from around the world",
+    "feature2Title": "Instant Chat",
+    "feature2Desc": "Talk with your friends in real time",
+    "feature3Title": "Likes",
+    "feature3Desc": "Show your support and appreciation",
+    "feature4Title": "Share",
+    "feature4Desc": "Share your special moments with everyone"
   },
   "nav": {
     "home": "Home",
@@ -120,6 +134,7 @@
     "success": "Success",
     "bio": "Bio",
     "bioPlaceholder": "Write a short bio about yourself...",
-    "areYouSure": "Are you sure?"
+    "areYouSure": "Are you sure?",
+    "back": "Back"
   }
 }
