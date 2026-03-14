@@ -226,7 +226,7 @@ export default function SearchPage() {
             </TabsTrigger>
             <TabsTrigger value="posts" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
               <FileText className="h-4 w-4" />
-              منشورات ({results.posts.length})
+              {t('search.posts')} ({results.posts.length})
             </TabsTrigger>
             <TabsTrigger value="hashtags" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
               <Hash className="h-4 w-4" />
