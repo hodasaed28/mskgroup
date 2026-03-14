@@ -127,7 +127,7 @@ export default function NotificationsPage() {
                     {notification.type === 'friend_request' && !notification.is_read && (
                       <div className="flex gap-2 mt-3">
                         <Button size="sm" className="rounded-xl gradient-primary text-primary-foreground shadow-glow" onClick={() => handleFriendRequestAction(notification, true)}>
-                          <Check className="h-3.5 w-3.5 ml-1" />قبول
+                          <Check className="h-3.5 w-3.5 ml-1" />{t('notifications.accept')}
                         </Button>
                         <Button size="sm" variant="outline" className="rounded-xl border-border/50" onClick={() => handleFriendRequestAction(notification, false)}>
                           <X className="h-3.5 w-3.5 ml-1" />رفض
