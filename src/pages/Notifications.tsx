@@ -18,9 +18,13 @@ export default function NotificationsPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
   const { profile, notificationCount, messageCount, toggleChat, refreshNotifications } = useChatContext();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const dateLocaleMap: Record<string, Locale> = { ar, en: enUS, fr, tr };
+  const dateLang = dateLocaleMap[t('app.name') ? 'ar' : 'en'] || ar;
 
   useEffect(() => { if (!authLoading && !user) navigate('/auth'); }, [user, authLoading, navigate]);
   useEffect(() => { if (user) fetchNotifications(); }, [user]);
