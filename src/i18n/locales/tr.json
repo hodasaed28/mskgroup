@@ -114,6 +114,7 @@
     "success": "Başarılı",
     "bio": "Biyografi",
     "bioPlaceholder": "Kendiniz hakkında kısa bir biyografi yazın...",
-    "areYouSure": "Emin misiniz?"
+    "areYouSure": "Emin misiniz?",
+    "back": "Geri"
   }
 }

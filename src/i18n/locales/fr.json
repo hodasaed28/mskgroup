@@ -114,6 +114,7 @@
     "success": "Succès",
     "bio": "Bio",
     "bioPlaceholder": "Écrivez une courte bio...",
-    "areYouSure": "Êtes-vous sûr?"
+    "areYouSure": "Êtes-vous sûr?",
+    "back": "Retour"
   }
 }
