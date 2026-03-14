@@ -54,7 +54,7 @@ export default function FriendsPage() {
 
   const cancelRequest = async (friendshipId: string) => {
     const { error } = await supabase.from('friendships').delete().eq('id', friendshipId);
-    if (!error) { toast({ title: 'تم إلغاء الطلب' }); fetchRequests(); }
+    if (!error) { toast({ title: t('friends.requestCanceled') }); fetchRequests(); }
   };
 
   const removeFriend = async (friendId: string) => {
