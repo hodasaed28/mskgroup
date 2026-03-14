@@ -146,7 +146,7 @@ export default function FriendsPage() {
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" className="rounded-xl gradient-primary text-primary-foreground shadow-glow" onClick={() => handleRequest(request.id, true)}>
-                          <Check className="h-4 w-4 ml-1" />قبول
+                          <Check className="h-4 w-4 ml-1" />{t('friends.accept')}
                         </Button>
                         <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => handleRequest(request.id, false)}>
                           <X className="h-4 w-4 ml-1" />رفض
