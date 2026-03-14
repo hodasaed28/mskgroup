@@ -19,6 +19,8 @@ export default function FriendsPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
   const { profile, notificationCount, messageCount, toggleChat } = useChatContext();
   const [friends, setFriends] = useState<Profile[]>([]);
   const [requests, setRequests] = useState<Friendship[]>([]);
