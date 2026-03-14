@@ -127,7 +127,7 @@ export default function FriendsPage() {
             {requests.length === 0 ? (
               <Card className="glass rounded-2xl p-12 text-center border-border/50">
                 <UserPlus className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-                <p className="text-muted-foreground">لا توجد طلبات صداقة</p>
+                <p className="text-muted-foreground">{t('friends.noRequests')}</p>
               </Card>
             ) : (
               <div className="space-y-4">
