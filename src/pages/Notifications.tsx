@@ -98,7 +98,7 @@ export default function NotificationsPage() {
             </div>
           </div>
           {unreadCount > 0 && (
-            <Button variant="outline" size="sm" onClick={markAllAsRead} className="rounded-xl border-border/50">تحديد الكل كمقروء</Button>
+            <Button variant="outline" size="sm" onClick={markAllAsRead} className="rounded-xl border-border/50">{t('notifications.markAllRead')}</Button>
           )}
         </div>
 
