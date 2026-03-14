@@ -86,7 +86,7 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header profile={profile} notificationCount={notificationCount} messageCount={messageCount} onMessagesClick={toggleChat} />
-      <div className="container mx-auto px-4 py-6 max-w-2xl" dir="rtl">
+      <div className="container mx-auto px-4 py-6 max-w-2xl" dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center shadow-glow">
