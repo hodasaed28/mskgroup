@@ -276,7 +276,7 @@ export default function SearchPage() {
                       </div>
                       <Button size="sm" className="rounded-xl gradient-primary text-primary-foreground shadow-glow" onClick={() => sendFriendRequest(person.id)}>
                         <UserPlus className="h-4 w-4 ml-1" />
-                        إضافة
+                        {t('search.add')}
                       </Button>
                     </div>
                   </Card>
