@@ -33,7 +33,21 @@
     "loginSuccess": "Connexion réussie",
     "dataError": "Erreur de données",
     "error": "Erreur",
-    "selectCountry": "Sélectionner le pays"
+    "selectCountry": "Sélectionner le pays",
+    "welcome": "Bienvenue",
+    "subtitle": "Connectez-vous avec vos amis et votre famille du monde entier",
+    "forgotPassword": "Mot de passe oublié ?",
+    "register": "Inscription",
+    "or": "Ou",
+    "googleSignIn": "Se connecter avec Google",
+    "feature1Title": "Nouveaux amis",
+    "feature1Desc": "Rencontrez de nouvelles personnes du monde entier",
+    "feature2Title": "Chat instantané",
+    "feature2Desc": "Discutez avec vos amis en temps réel",
+    "feature3Title": "J'aime",
+    "feature3Desc": "Montrez votre soutien et votre appréciation",
+    "feature4Title": "Partager",
+    "feature4Desc": "Partagez vos moments spéciaux avec tout le monde"
   },
   "nav": {
     "home": "Accueil",
