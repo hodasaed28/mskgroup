@@ -222,7 +222,7 @@ export default function SearchPage() {
           <TabsList className="grid w-full grid-cols-3 mb-6 bg-muted/60 rounded-xl h-11">
             <TabsTrigger value="people" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
               <Users className="h-4 w-4" />
-              أشخاص ({results.people.length})
+              {t('search.people')} ({results.people.length})
             </TabsTrigger>
             <TabsTrigger value="posts" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
               <FileText className="h-4 w-4" />
