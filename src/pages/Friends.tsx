@@ -88,7 +88,7 @@ export default function FriendsPage() {
               <UserPlus className="h-4 w-4" />{t('friends.friendRequests')} ({requests.length})
             </TabsTrigger>
             <TabsTrigger value="sent" className="rounded-lg font-semibold gap-2 data-[state=active]:shadow-card">
-              <Clock className="h-4 w-4" />المرسلة ({sentRequests.length})
+              <Clock className="h-4 w-4" />{t('friends.sent')} ({sentRequests.length})
             </TabsTrigger>
           </TabsList>
 
