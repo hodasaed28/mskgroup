@@ -250,8 +250,8 @@ export default function SearchPage() {
           ) : !hasQuery ? (
             <Card className="glass rounded-2xl p-12 text-center border-border/50">
               <Sparkles className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
-              <p className="text-muted-foreground font-medium">ابحث عن أصدقاء، منشورات، وهاشتاقات</p>
-              <p className="text-sm text-muted-foreground mt-1">اكتب في حقل البحث أعلاه للبدء</p>
+              <p className="text-muted-foreground font-medium">{t('search.emptyTitle')}</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('search.emptySubtitle')}</p>
             </Card>
           ) : (
             <>
