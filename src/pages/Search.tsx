@@ -338,7 +338,7 @@ export default function SearchPage() {
                         <p className="text-sm text-muted-foreground">{hashtag.post_count} {t('search.postCount')}</p>
                       </div>
                       <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => handleSelectSuggestion(`#${hashtag.name}`)}>
-                        عرض
+                        {t('search.view')}
                       </Button>
                     </div>
                   </Card>
