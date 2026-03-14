@@ -8,9 +8,11 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, UserPlus, Bell, Loader2, Check, X, UserCheck, UserX } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { ar, enUS, fr, tr } from 'date-fns/locale';
 import { useChatContext } from '@/contexts/ChatContext';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export default function NotificationsPage() {
   const { user, loading: authLoading } = useAuth();
