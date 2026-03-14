@@ -163,7 +163,7 @@ export default function FriendsPage() {
             {sentRequests.length === 0 ? (
               <Card className="glass rounded-2xl p-12 text-center border-border/50">
                 <Clock className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-                <p className="text-muted-foreground">لا توجد طلبات مرسلة</p>
+                <p className="text-muted-foreground">{t('friends.noSentRequests')}</p>
               </Card>
             ) : (
               <div className="space-y-4">
