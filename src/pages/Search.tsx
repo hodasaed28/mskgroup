@@ -335,7 +335,7 @@ export default function SearchPage() {
                       </div>
                       <div className="flex-1">
                         <p className="font-bold text-primary">#{hashtag.name}</p>
-                        <p className="text-sm text-muted-foreground">{hashtag.post_count} منشور</p>
+                        <p className="text-sm text-muted-foreground">{hashtag.post_count} {t('search.postCount')}</p>
                       </div>
                       <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => handleSelectSuggestion(`#${hashtag.name}`)}>
                         عرض
