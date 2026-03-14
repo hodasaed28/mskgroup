@@ -142,7 +142,7 @@ export default function FriendsPage() {
                       </Link>
                       <div className="flex-1 min-w-0">
                         <Link to={`/profile/${request.requester?.id}`} className="font-semibold hover:text-primary transition-colors block truncate">{request.requester?.full_name || request.requester?.username}</Link>
-                        <p className="text-sm text-muted-foreground">يريد إضافتك كصديق</p>
+                        <p className="text-sm text-muted-foreground">{t('friends.wantsToAdd')}</p>
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" className="rounded-xl gradient-primary text-primary-foreground shadow-glow" onClick={() => handleRequest(request.id, true)}>
