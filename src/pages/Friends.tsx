@@ -114,7 +114,7 @@ export default function FriendsPage() {
                         <p className="text-sm text-muted-foreground">@{friend.username}</p>
                       </div>
                       <Button variant="outline" size="sm" className="rounded-xl border-border/50 hover:border-destructive/30 hover:text-destructive hover:bg-destructive/5 transition-all" onClick={() => removeFriend(friend.id)}>
-                        <UserMinus className="h-4 w-4 ml-2" />إزالة
+                        <UserMinus className="h-4 w-4 ml-2" />{t('friends.remove')}
                       </Button>
                     </div>
                   </Card>
