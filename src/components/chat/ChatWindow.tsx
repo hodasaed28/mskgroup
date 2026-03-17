@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,10 +10,12 @@ import { X, Send, Phone, Video, Minus, Check, CheckCheck, Paperclip, Image as Im
 import { Profile, Message } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { ar, enUS, fr, tr } from 'date-fns/locale';
 import { WebRTCVideoCall } from './WebRTCVideoCall';
 import { EmojiPicker } from '@/components/ui/emoji-picker';
 import { useToast } from '@/hooks/use-toast';
+
+const localeMap: Record<string, Locale> = { ar, en: enUS, fr, tr };
 
 interface ChatWindowProps {
   friend: Profile;
@@ -22,14 +26,14 @@ interface ChatWindowProps {
 }
 
 export default function ChatWindow({ friend, currentUser, onClose, onMinimize, isMinimized }: ChatWindowProps) {
+  const { t, i18n } = useTranslation();
+  const { isRTL } = useLanguage();
+  const dateLocale = localeMap[i18n.language] || enUS;
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [friendIsTyping, setFriendIsTyping] = useState(false);
-  const [friendOnlineStatus, setFriendOnlineStatus] = useState<{ is_online: boolean; last_seen: string | null }>({
-    is_online: false,
-    last_seen: null
-  });
+  const [friendOnlineStatus, setFriendOnlineStatus] = useState<{ is_online: boolean; last_seen: string | null }>({ is_online: false, last_seen: null });
   const [showVideoCall, setShowVideoCall] = useState(false);
   const [showVoiceCall, setShowVoiceCall] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -41,206 +45,73 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchMessages();
-    markAsRead();
-    fetchFriendStatus();
+    fetchMessages(); markAsRead(); fetchFriendStatus();
 
-    // Subscribe to new messages
-    const messagesChannel = supabase
-      .channel(`messages-${friend.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-        },
-        (payload) => {
-          const newMsg = payload.new as Message;
-          if (
-            (newMsg.sender_id === friend.id && newMsg.receiver_id === currentUser.id) ||
-            (newMsg.sender_id === currentUser.id && newMsg.receiver_id === friend.id)
-          ) {
-            setMessages(prev => [...prev, newMsg]);
-            if (newMsg.sender_id === friend.id) {
-              markAsRead();
-            }
-          }
+    const messagesChannel = supabase.channel(`messages-${friend.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        const newMsg = payload.new as Message;
+        if ((newMsg.sender_id === friend.id && newMsg.receiver_id === currentUser.id) || (newMsg.sender_id === currentUser.id && newMsg.receiver_id === friend.id)) {
+          setMessages(prev => [...prev, newMsg]);
+          if (newMsg.sender_id === friend.id) markAsRead();
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-        },
-        (payload) => {
-          const updatedMsg = payload.new as Message;
-          setMessages(prev => prev.map(msg => 
-            msg.id === updatedMsg.id ? updatedMsg : msg
-          ));
-        }
-      )
-      .subscribe();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+        const updatedMsg = payload.new as Message;
+        setMessages(prev => prev.map(msg => msg.id === updatedMsg.id ? updatedMsg : msg));
+      }).subscribe();
 
-    // Subscribe to typing indicators
-    const typingChannel = supabase
-      .channel(`typing-${friend.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'typing_indicators',
-          filter: `user_id=eq.${friend.id}`,
-        },
-        (payload: any) => {
-          if (payload.new?.chat_with_id === currentUser.id) {
-            setFriendIsTyping(payload.new?.is_typing || false);
-          }
-        }
-      )
-      .subscribe();
+    const typingChannel = supabase.channel(`typing-${friend.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'typing_indicators', filter: `user_id=eq.${friend.id}` }, (payload: any) => {
+        if (payload.new?.chat_with_id === currentUser.id) setFriendIsTyping(payload.new?.is_typing || false);
+      }).subscribe();
 
-    // Subscribe to friend's online status
-    const onlineChannel = supabase
-      .channel(`online-${friend.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${friend.id}`,
-        },
-        (payload: any) => {
-          setFriendOnlineStatus({
-            is_online: payload.new?.is_online || false,
-            last_seen: payload.new?.last_seen
-          });
-        }
-      )
-      .subscribe();
+    const onlineChannel = supabase.channel(`online-${friend.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${friend.id}` }, (payload: any) => {
+        setFriendOnlineStatus({ is_online: payload.new?.is_online || false, last_seen: payload.new?.last_seen });
+      }).subscribe();
 
-    return () => {
-      supabase.removeChannel(messagesChannel);
-      supabase.removeChannel(typingChannel);
-      supabase.removeChannel(onlineChannel);
-      // Clear typing indicator when leaving
-      updateTypingStatus(false);
-    };
+    return () => { supabase.removeChannel(messagesChannel); supabase.removeChannel(typingChannel); supabase.removeChannel(onlineChannel); updateTypingStatus(false); };
   }, [friend.id, currentUser.id]);
 
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const fetchFriendStatus = async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('is_online, last_seen')
-      .eq('id', friend.id)
-      .single();
-    
-    if (data) {
-      setFriendOnlineStatus({
-        is_online: (data as any).is_online || false,
-        last_seen: (data as any).last_seen
-      });
-    }
+    const { data } = await supabase.from('profiles').select('is_online, last_seen').eq('id', friend.id).single();
+    if (data) setFriendOnlineStatus({ is_online: (data as any).is_online || false, last_seen: (data as any).last_seen });
   };
 
   const fetchMessages = async () => {
-    const { data } = await supabase
-      .from('messages')
-      .select('*')
+    const { data } = await supabase.from('messages').select('*')
       .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${friend.id}),and(sender_id.eq.${friend.id},receiver_id.eq.${currentUser.id})`)
       .order('created_at', { ascending: true });
-
-    if (data) {
-      setMessages(data as Message[]);
-    }
+    if (data) setMessages(data as Message[]);
   };
 
   const markAsRead = async () => {
-    await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('sender_id', friend.id)
-      .eq('receiver_id', currentUser.id)
-      .eq('is_read', false);
+    await supabase.from('messages').update({ is_read: true }).eq('sender_id', friend.id).eq('receiver_id', currentUser.id).eq('is_read', false);
   };
 
   const updateTypingStatus = async (typing: boolean) => {
     try {
-      const { data: existing } = await supabase
-        .from('typing_indicators')
-        .select('id')
-        .eq('user_id', currentUser.id)
-        .eq('chat_with_id', friend.id)
-        .single();
-
-      if (existing) {
-        await supabase
-          .from('typing_indicators')
-          .update({ is_typing: typing, updated_at: new Date().toISOString() })
-          .eq('id', existing.id);
-      } else if (typing) {
-        await supabase
-          .from('typing_indicators')
-          .insert({
-            user_id: currentUser.id,
-            chat_with_id: friend.id,
-            is_typing: typing,
-          });
-      }
-    } catch (e) {
-      // Ignore errors for typing indicators
-    }
+      const { data: existing } = await supabase.from('typing_indicators').select('id').eq('user_id', currentUser.id).eq('chat_with_id', friend.id).single();
+      if (existing) await supabase.from('typing_indicators').update({ is_typing: typing, updated_at: new Date().toISOString() }).eq('id', existing.id);
+      else if (typing) await supabase.from('typing_indicators').insert({ user_id: currentUser.id, chat_with_id: friend.id, is_typing: typing });
+    } catch (e) {}
   };
 
   const handleTyping = (value: string) => {
     setNewMessage(value);
-    
-    if (!isTyping) {
-      setIsTyping(true);
-      updateTypingStatus(true);
-    }
-
-    // Clear existing timeout
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-
-    // Set new timeout to stop typing indicator after 2 seconds
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsTyping(false);
-      updateTypingStatus(false);
-    }, 2000);
+    if (!isTyping) { setIsTyping(true); updateTypingStatus(true); }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => { setIsTyping(false); updateTypingStatus(false); }, 2000);
   };
 
   const handleSend = async () => {
     if (!newMessage.trim()) return;
-
-    // Clear typing indicator
-    setIsTyping(false);
-    updateTypingStatus(false);
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-
-    const { error } = await supabase
-      .from('messages')
-      .insert({
-        sender_id: currentUser.id,
-        receiver_id: friend.id,
-        content: newMessage.trim(),
-      });
-
-    if (!error) {
-      setNewMessage('');
-    }
+    setIsTyping(false); updateTypingStatus(false);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    const { error } = await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: friend.id, content: newMessage.trim() });
+    if (!error) setNewMessage('');
   };
 
   const handleFileUpload = async (file: File, type: 'image' | 'file') => {
@@ -249,106 +120,52 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentUser.id}/${Date.now()}.${fileExt}`;
       const filePath = `chat-attachments/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(filePath, file);
-
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
       if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('media')
-        .getPublicUrl(filePath);
-
+      const { data: urlData } = supabase.storage.from('media').getPublicUrl(filePath);
       const prefix = type === 'image' ? '📷 ' : '📎 ';
-      const content = `${prefix}${urlData.publicUrl}`;
-
-      await supabase.from('messages').insert({
-        sender_id: currentUser.id,
-        receiver_id: friend.id,
-        content,
-      });
+      await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: friend.id, content: `${prefix}${urlData.publicUrl}` });
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
-    } finally {
-      setUploadingFile(false);
-    }
+      toast({ title: t('common.error'), description: err.message, variant: 'destructive' });
+    } finally { setUploadingFile(false); }
   };
 
-  const handleEmojiSelect = (emoji: string) => {
-    setNewMessage(prev => prev + emoji);
-  };
-
+  const handleEmojiSelect = (emoji: string) => { setNewMessage(prev => prev + emoji); };
   const isImageMessage = (content: string) => content.startsWith('📷 ');
   const isFileMessage = (content: string) => content.startsWith('📎 ');
   const getAttachmentUrl = (content: string) => content.substring(2).trim();
-
-  const handleProfileClick = () => {
-    navigate(`/profile/${friend.id}`);
-  };
+  const handleProfileClick = () => { navigate(`/profile/${friend.id}`); };
 
   const getOnlineStatusText = () => {
-    if (friendOnlineStatus.is_online) {
-      return 'متصل الآن';
-    }
-    if (friendOnlineStatus.last_seen) {
-      return `آخر ظهور ${formatDistanceToNow(new Date(friendOnlineStatus.last_seen), { addSuffix: true, locale: ar })}`;
-    }
-    return 'غير متصل';
+    if (friendOnlineStatus.is_online) return t('chat.onlineNow');
+    if (friendOnlineStatus.last_seen) return `${t('chat.lastSeen')} ${formatDistanceToNow(new Date(friendOnlineStatus.last_seen), { addSuffix: true, locale: dateLocale })}`;
+    return t('chat.offlineStatus');
   };
 
   if (isMinimized) {
     return (
-      <div 
-        className="fixed bottom-0 left-4 w-64 bg-primary text-primary-foreground rounded-t-xl shadow-xl border z-50 cursor-pointer"
-        onClick={onMinimize}
-      >
+      <div className="fixed bottom-0 left-4 w-64 bg-primary text-primary-foreground rounded-t-xl shadow-xl border z-50 cursor-pointer" onClick={onMinimize}>
         <div className="flex items-center justify-between p-3">
           <div className="flex items-center gap-2">
             <div className="relative">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={friend.avatar_url || ''} />
-                <AvatarFallback className="bg-primary-foreground text-primary text-sm">
-                  {friend.username.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              {friendOnlineStatus.is_online && (
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-primary rounded-full" />
-              )}
+              <Avatar className="h-8 w-8"><AvatarImage src={friend.avatar_url || ''} /><AvatarFallback className="bg-primary-foreground text-primary text-sm">{friend.username.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
+              {friendOnlineStatus.is_online && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-primary rounded-full" />}
             </div>
             <p className="font-semibold text-sm truncate">{friend.full_name || friend.username}</p>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-6 w-6 text-primary-foreground hover:bg-primary-foreground/20"
-            onClick={(e) => { e.stopPropagation(); onClose(); }}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6 text-primary-foreground hover:bg-primary-foreground/20" onClick={(e) => { e.stopPropagation(); onClose(); }}><X className="h-4 w-4" /></Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed bottom-0 left-4 w-80 bg-card rounded-t-xl shadow-xl border z-50 animate-fade-in" dir="rtl">
-      {/* Header */}
+    <div className="fixed bottom-0 left-4 w-80 bg-card rounded-t-xl shadow-xl border z-50 animate-fade-in" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between p-3 border-b bg-primary text-primary-foreground rounded-t-xl">
-        <div 
-          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-          onClick={handleProfileClick}
-        >
+        <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={handleProfileClick}>
           <div className="relative">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={friend.avatar_url || ''} />
-              <AvatarFallback className="bg-primary-foreground text-primary text-sm">
-                {friend.username.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            {friendOnlineStatus.is_online && (
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-primary rounded-full" />
-            )}
+            <Avatar className="h-8 w-8"><AvatarImage src={friend.avatar_url || ''} /><AvatarFallback className="bg-primary-foreground text-primary text-sm">{friend.username.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
+            {friendOnlineStatus.is_online && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-primary rounded-full" />}
           </div>
           <div>
             <p className="font-semibold text-sm">{friend.full_name || friend.username}</p>
@@ -356,34 +173,13 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20"
-            onClick={() => setShowVoiceCall(true)}
-          >
-            <Phone className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20"
-            onClick={() => setShowVideoCall(true)}
-          >
-            <Video className="h-4 w-4" />
-          </Button>
-          {onMinimize && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20" onClick={onMinimize}>
-              <Minus className="h-4 w-4" />
-            </Button>
-          )}
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => setShowVoiceCall(true)}><Phone className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => setShowVideoCall(true)}><Video className="h-4 w-4" /></Button>
+          {onMinimize && <Button variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20" onClick={onMinimize}><Minus className="h-4 w-4" /></Button>}
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20" onClick={onClose}><X className="h-4 w-4" /></Button>
         </div>
       </div>
 
-      {/* Messages */}
       <ScrollArea className="h-80 p-3">
         <div className="space-y-3">
           {messages.map((message) => {
@@ -391,47 +187,20 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
             const isImage = isImageMessage(message.content);
             const isFile = isFileMessage(message.content);
             const attachmentUrl = (isImage || isFile) ? getAttachmentUrl(message.content) : '';
-            
             return (
-              <div
-                key={message.id}
-                className={`flex ${isMine ? 'justify-start' : 'justify-end'}`}
-              >
-                <div
-                  className={`max-w-[70%] px-3 py-2 rounded-2xl ${
-                    isMine
-                      ? 'bg-primary text-primary-foreground rounded-br-sm'
-                      : 'bg-muted rounded-bl-sm'
-                  }`}
-                >
-                  {isImage ? (
-                    <img src={attachmentUrl} alt="Shared image" className="rounded-lg max-w-full max-h-48 object-cover cursor-pointer" onClick={() => window.open(attachmentUrl, '_blank')} />
-                  ) : isFile ? (
-                    <a href={attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm underline">
-                      <Paperclip className="h-4 w-4" />
-                      Attachment
-                    </a>
-                  ) : (
-                    <p className="text-sm">{message.content}</p>
-                  )}
+              <div key={message.id} className={`flex ${isMine ? 'justify-start' : 'justify-end'}`}>
+                <div className={`max-w-[70%] px-3 py-2 rounded-2xl ${isMine ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted rounded-bl-sm'}`}>
+                  {isImage ? <img src={attachmentUrl} alt={t('chat.attachment')} className="rounded-lg max-w-full max-h-48 object-cover cursor-pointer" onClick={() => window.open(attachmentUrl, '_blank')} />
+                    : isFile ? <a href={attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm underline"><Paperclip className="h-4 w-4" />{t('chat.attachment')}</a>
+                    : <p className="text-sm">{message.content}</p>}
                   <div className={`flex items-center gap-1 mt-1 ${isMine ? 'justify-start' : 'justify-end'}`}>
-                    <p className={`text-[10px] ${isMine ? 'opacity-70' : 'text-muted-foreground'}`}>
-                      {formatDistanceToNow(new Date(message.created_at), { addSuffix: true, locale: ar })}
-                    </p>
-                    {isMine && (
-                      message.is_read ? (
-                        <CheckCheck className="h-3 w-3 text-blue-400" />
-                      ) : (
-                        <Check className="h-3 w-3 opacity-70" />
-                      )
-                    )}
+                    <p className={`text-[10px] ${isMine ? 'opacity-70' : 'text-muted-foreground'}`}>{formatDistanceToNow(new Date(message.created_at), { addSuffix: true, locale: dateLocale })}</p>
+                    {isMine && (message.is_read ? <CheckCheck className="h-3 w-3 text-blue-400" /> : <Check className="h-3 w-3 opacity-70" />)}
                   </div>
                 </div>
               </div>
             );
           })}
-          
-          {/* Typing indicator */}
           {friendIsTyping && (
             <div className="flex justify-end">
               <div className="bg-muted px-3 py-2 rounded-2xl rounded-bl-sm">
@@ -443,66 +212,26 @@ export default function ChatWindow({ friend, currentUser, onClose, onMinimize, i
               </div>
             </div>
           )}
-          
           <div ref={scrollRef} />
         </div>
       </ScrollArea>
 
-      {/* Input */}
       <div className="p-2 border-t">
         <div className="flex items-center gap-1 mb-1">
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, 'image'); e.target.value = ''; }}
-          />
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, 'file'); e.target.value = ''; }}
-          />
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => imageInputRef.current?.click()} disabled={uploadingFile}>
-            <ImageIcon className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={uploadingFile}>
-            <Paperclip className="h-4 w-4" />
-          </Button>
+          <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, 'image'); e.target.value = ''; }} />
+          <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, 'file'); e.target.value = ''; }} />
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => imageInputRef.current?.click()} disabled={uploadingFile}><ImageIcon className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={uploadingFile}><Paperclip className="h-4 w-4" /></Button>
           <EmojiPicker onEmojiSelect={handleEmojiSelect} />
         </div>
         <div className="flex gap-2">
-          <Input
-            placeholder="اكتب رسالة..."
-            value={newMessage}
-            onChange={(e) => handleTyping(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            className="bg-muted border-0"
-          />
-          <Button size="icon" onClick={handleSend} disabled={!newMessage.trim() || uploadingFile}>
-            <Send className="h-4 w-4" />
-          </Button>
+          <Input placeholder={t('chat.typeMessage')} value={newMessage} onChange={(e) => handleTyping(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} className="bg-muted border-0" />
+          <Button size="icon" onClick={handleSend} disabled={!newMessage.trim() || uploadingFile}><Send className="h-4 w-4" /></Button>
         </div>
       </div>
 
-      {/* Video Call Dialog */}
-      <WebRTCVideoCall
-        open={showVideoCall}
-        onClose={() => setShowVideoCall(false)}
-        friend={friend}
-        currentUser={currentUser}
-        callType="video"
-      />
-
-      {/* Voice Call Dialog */}
-      <WebRTCVideoCall
-        open={showVoiceCall}
-        onClose={() => setShowVoiceCall(false)}
-        friend={friend}
-        currentUser={currentUser}
-        callType="voice"
-      />
+      <WebRTCVideoCall open={showVideoCall} onClose={() => setShowVideoCall(false)} friend={friend} currentUser={currentUser} callType="video" />
+      <WebRTCVideoCall open={showVoiceCall} onClose={() => setShowVoiceCall(false)} friend={friend} currentUser={currentUser} callType="voice" />
     </div>
   );
 }

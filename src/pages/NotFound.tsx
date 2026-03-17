@@ -1,18 +1,21 @@
 import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
 import { Home, ArrowLeft, Compass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const NotFound = () => {
   const location = useLocation();
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
 
   useEffect(() => {
     console.error("404 Error: User attempted to access non-existent route:", location.pathname);
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden" dir="rtl">
-      {/* Ambient background effects */}
+    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 -right-20 w-96 h-96 rounded-full bg-primary/5 blur-3xl animate-float" />
         <div className="absolute bottom-1/4 -left-20 w-80 h-80 rounded-full bg-accent/5 blur-3xl animate-float" style={{ animationDelay: '3s' }} />
@@ -20,7 +23,6 @@ const NotFound = () => {
       </div>
 
       <div className="relative z-10 text-center px-6 animate-fade-in">
-        {/* Animated 404 number */}
         <div className="relative mb-8">
           <h1 className="text-[10rem] md:text-[14rem] font-black leading-none gradient-text select-none tracking-tighter">
             404
@@ -32,32 +34,30 @@ const NotFound = () => {
           </div>
         </div>
 
-        {/* Content */}
         <div className="glass-strong rounded-3xl p-8 md:p-10 max-w-md mx-auto shadow-elevated">
-          <h2 className="text-2xl md:text-3xl font-bold mb-3">الصفحة غير موجودة</h2>
+          <h2 className="text-2xl md:text-3xl font-bold mb-3">{t('notFound.title')}</h2>
           <p className="text-muted-foreground mb-8 leading-relaxed">
-            عذراً، الصفحة التي تبحث عنها غير موجودة أو تم نقلها.
+            {t('notFound.description')}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button asChild size="lg" className="rounded-xl gradient-primary text-primary-foreground shadow-glow hover:shadow-glow-lg transition-all">
               <Link to="/">
-                <Home className="h-5 w-5 ml-2" />
-                الصفحة الرئيسية
+                <Home className={`h-5 w-5 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                {t('notFound.home')}
               </Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-xl border-border/50">
               <Link to="/search">
-                <ArrowLeft className="h-5 w-5 ml-2" />
-                البحث
+                <ArrowLeft className={`h-5 w-5 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                {t('notFound.search')}
               </Link>
             </Button>
           </div>
         </div>
 
-        {/* Footer */}
         <p className="text-xs text-muted-foreground mt-8">
-          © 2026 MSK Group. All rights reserved.
+          {t('app.copyright')}
         </p>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Reel } from '@/types/database';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ export function ReelCard({
   onComment,
   onShare,
 }: ReelCardProps) {
+  const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -134,14 +136,12 @@ export function ReelCard({
             {/* Left: user info & caption */}
             <div className="flex-1 min-w-0 space-y-3">
               <Link to={`/profile/${reel.user_id}`} className="flex items-center gap-3 group">
-                <div className="relative">
-                  <Avatar className="h-11 w-11 ring-2 ring-white/80 group-hover:ring-primary transition-all">
-                    <AvatarImage src={reel.profiles?.avatar_url || ''} />
-                    <AvatarFallback className="bg-white/20 text-white text-sm font-bold">
-                      {reel.profiles?.username?.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
+                <Avatar className="h-11 w-11 ring-2 ring-white/80 group-hover:ring-primary transition-all">
+                  <AvatarImage src={reel.profiles?.avatar_url || ''} />
+                  <AvatarFallback className="bg-white/20 text-white text-sm font-bold">
+                    {reel.profiles?.username?.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
                 <span className="text-white font-semibold text-[15px] drop-shadow-lg">
                   {reel.profiles?.full_name || reel.profiles?.username}
                 </span>
@@ -156,7 +156,7 @@ export function ReelCard({
               {/* Music indicator */}
               <div className="flex items-center gap-2 text-white/70 text-xs">
                 <Music className="h-3 w-3 animate-spin" style={{ animationDuration: '3s' }} />
-                <span className="truncate max-w-[180px]">Original Audio</span>
+                <span className="truncate max-w-[180px]">{t('reels.originalAudio')}</span>
               </div>
             </div>
 
