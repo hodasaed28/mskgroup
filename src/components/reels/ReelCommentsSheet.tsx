@@ -13,7 +13,7 @@ import { Profile } from '@/types/database';
 import { formatDistanceToNow } from 'date-fns';
 import { ar, enUS, fr, tr } from 'date-fns/locale';
 
-const localeMap: Record<string, Locale> = { ar, en: enUS, fr, tr };
+const localeMap: Record<string, typeof ar> = { ar, en: enUS, fr, tr };
 
 interface ReelComment { id: string; reel_id: string; user_id: string; content: string; created_at: string; profiles?: Profile; }
 interface ReelCommentsSheetProps { open: boolean; onOpenChange: (open: boolean) => void; reelId: string; currentUser: Profile | null; }

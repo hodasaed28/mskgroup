@@ -15,7 +15,7 @@ import { ar, enUS, fr, tr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { CreateGroupDialog } from '@/components/groups/CreateGroupDialog';
 
-const localeMap: Record<string, Locale> = { ar, en: enUS, fr, tr };
+const localeMap: Record<string, typeof ar> = { ar, en: enUS, fr, tr };
 
 interface ChatSidebarProps {
   isOpen: boolean;

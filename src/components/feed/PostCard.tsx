@@ -17,7 +17,7 @@ import { ar, enUS, fr, tr } from 'date-fns/locale';
 import EditPostDialog from './EditPostDialog';
 import SharePostDialog from './SharePostDialog';
 
-const localeMap: Record<string, Locale> = { ar, en: enUS, fr, tr };
+const localeMap: Record<string, typeof ar> = { ar, en: enUS, fr, tr };
 
 interface PostCardProps {
   post: Post;

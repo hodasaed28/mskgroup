@@ -15,7 +15,7 @@ import { WebRTCVideoCall } from './WebRTCVideoCall';
 import { EmojiPicker } from '@/components/ui/emoji-picker';
 import { useToast } from '@/hooks/use-toast';
 
-const localeMap: Record<string, Locale> = { ar, en: enUS, fr, tr };
+const localeMap: Record<string, typeof ar> = { ar, en: enUS, fr, tr };
 
 interface ChatWindowProps {
   friend: Profile;
