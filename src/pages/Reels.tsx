@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from 'react-i18next';
 import { Reel } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { useChatContext } from '@/contexts/ChatContext';
@@ -14,6 +15,7 @@ import { UploadReelDialog } from '@/components/reels/UploadReelDialog';
 export default function ReelsPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
 
   const { profile } = useChatContext();
@@ -99,7 +101,6 @@ export default function ReelsPage() {
     }
   }, [currentIndex, reels.length]);
 
-  // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown' || e.key === 'j') goTo('down');
@@ -110,7 +111,6 @@ export default function ReelsPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [goTo]);
 
-  // Wheel navigation
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -123,7 +123,6 @@ export default function ReelsPage() {
     return () => el.removeEventListener('wheel', handler);
   }, [goTo]);
 
-  // Touch swipe
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
   };
@@ -166,19 +165,18 @@ export default function ReelsPage() {
         {reels.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-4">
             <Film className="h-16 w-16 text-white/30" />
-            <p className="text-white/50 text-lg">لا توجد ريلز بعد</p>
+            <p className="text-white/50 text-lg">{t('reels.noReels')}</p>
             <Button
               variant="outline"
               className="border-white/20 text-white hover:bg-white/10"
               onClick={() => setDialogOpen(true)}
             >
               <Plus className="h-4 w-4 ml-2" />
-              أنشئ أول ريل
+              {t('reels.createFirst')}
             </Button>
           </div>
         ) : (
           <>
-            {/* Reels stack with slide animation */}
             <div className="relative w-full h-full max-w-lg mx-auto">
               {reels.map((reel, index) => {
                 const offset = index - currentIndex;
@@ -209,29 +207,15 @@ export default function ReelsPage() {
               })}
             </div>
 
-            {/* Navigation buttons - desktop */}
             <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex-col gap-3 z-30" style={{ marginLeft: 'min(280px, 40vw)' }}>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-12 w-12 rounded-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 transition-all disabled:opacity-30"
-                onClick={() => goTo('up')}
-                disabled={currentIndex === 0}
-              >
+              <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 transition-all disabled:opacity-30" onClick={() => goTo('up')} disabled={currentIndex === 0}>
                 <ChevronUp className="h-6 w-6" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-12 w-12 rounded-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 transition-all disabled:opacity-30"
-                onClick={() => goTo('down')}
-                disabled={currentIndex === reels.length - 1}
-              >
+              <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/10 transition-all disabled:opacity-30" onClick={() => goTo('down')} disabled={currentIndex === reels.length - 1}>
                 <ChevronDown className="h-6 w-6" />
               </Button>
             </div>
 
-            {/* Reel counter */}
             <div className="absolute top-5 left-1/2 -translate-x-1/2 z-30">
               <div className="bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10">
                 <span className="text-white/80 text-sm font-medium">
@@ -240,16 +224,13 @@ export default function ReelsPage() {
               </div>
             </div>
 
-            {/* Dot indicators (right side, vertical) */}
             {reels.length > 1 && reels.length <= 20 && (
               <div className="absolute left-3 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-1.5">
                 {reels.map((_, i) => (
                   <button
                     key={i}
                     className={`rounded-full transition-all duration-300 ${
-                      i === currentIndex
-                        ? 'w-2 h-4 bg-white'
-                        : 'w-2 h-2 bg-white/30 hover:bg-white/50'
+                      i === currentIndex ? 'w-2 h-4 bg-white' : 'w-2 h-2 bg-white/30 hover:bg-white/50'
                     }`}
                     onClick={() => setCurrentIndex(i)}
                   />
@@ -259,7 +240,6 @@ export default function ReelsPage() {
           </>
         )}
 
-        {/* Upload FAB */}
         <Button
           className="absolute bottom-6 right-6 z-30 h-14 w-14 rounded-full shadow-2xl bg-primary hover:bg-primary/90 transition-all hover:scale-105"
           size="icon"
@@ -268,44 +248,25 @@ export default function ReelsPage() {
           <Plus className="h-6 w-6" />
         </Button>
 
-        {/* Back button */}
         <Button
           variant="ghost"
           className="absolute top-5 right-5 z-30 text-white hover:bg-white/10 rounded-full"
           onClick={() => navigate('/')}
         >
-          الرئيسية
+          {t('reels.home')}
         </Button>
       </div>
 
-      {/* Upload dialog */}
       {profile && (
-        <UploadReelDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          profileId={profile.id}
-          onUploaded={fetchReels}
-        />
+        <UploadReelDialog open={dialogOpen} onOpenChange={setDialogOpen} profileId={profile.id} onUploaded={fetchReels} />
       )}
 
-      {/* Comments */}
       {selectedReelId && (
-        <ReelCommentsSheet
-          open={commentsOpen}
-          onOpenChange={setCommentsOpen}
-          reelId={selectedReelId}
-          currentUser={profile}
-        />
+        <ReelCommentsSheet open={commentsOpen} onOpenChange={setCommentsOpen} reelId={selectedReelId} currentUser={profile} />
       )}
 
-      {/* Share */}
       {selectedReelId && (
-        <ShareReelDialog
-          open={shareOpen}
-          onOpenChange={setShareOpen}
-          reelId={selectedReelId}
-          currentUser={profile}
-        />
+        <ShareReelDialog open={shareOpen} onOpenChange={setShareOpen} reelId={selectedReelId} currentUser={profile} />
       )}
     </div>
   );

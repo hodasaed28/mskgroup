@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -6,6 +7,7 @@ import { Profile } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import CreateStoryDialog from './CreateStoryDialog';
 import StoryViewer from './StoryViewer';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface Story {
   id: string;
@@ -29,6 +31,8 @@ interface StoriesBarProps {
 }
 
 export default function StoriesBar({ currentUser }: StoriesBarProps) {
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
   const [groupedStories, setGroupedStories] = useState<GroupedStories[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedStoryGroup, setSelectedStoryGroup] = useState<GroupedStories | null>(null);
@@ -94,10 +98,8 @@ export default function StoriesBar({ currentUser }: StoriesBarProps) {
     }
   };
 
-  const currentUserStories = groupedStories.find(g => g.user.id === currentUser?.id);
-
   return (
-    <div className="bg-card rounded-lg p-4 shadow-sm mb-4" dir="rtl">
+    <div className="bg-card rounded-lg p-4 shadow-sm mb-4" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="relative">
         <Button
           variant="ghost"
@@ -133,7 +135,7 @@ export default function StoriesBar({ currentUser }: StoriesBarProps) {
                 <Plus className="h-6 w-6 text-primary" />
               )}
             </button>
-            <span className="text-xs text-muted-foreground">قصتك</span>
+            <span className="text-xs text-muted-foreground">{t('stories.yourStory')}</span>
           </div>
 
           {/* Stories */}

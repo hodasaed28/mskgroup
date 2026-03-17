@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
@@ -11,9 +13,11 @@ import {
 import { Post, Comment, Profile } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { ar, enUS, fr, tr } from 'date-fns/locale';
 import EditPostDialog from './EditPostDialog';
 import SharePostDialog from './SharePostDialog';
+
+const localeMap: Record<string, typeof ar> = { ar, en: enUS, fr, tr };
 
 interface PostCardProps {
   post: Post;
@@ -22,6 +26,8 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post, currentUser, onDelete }: PostCardProps) {
+  const { t, i18n } = useTranslation();
+  const { isRTL } = useLanguage();
   const [likes, setLikes] = useState<string[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [showComments, setShowComments] = useState(false);
@@ -99,10 +105,11 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
   const handleShareComplete = () => setShareCount(prev => prev + 1);
 
   const profile = currentPost.profiles;
-  const timeAgo = formatDistanceToNow(new Date(currentPost.created_at), { addSuffix: true, locale: ar });
+  const dateLocale = localeMap[i18n.language] || enUS;
+  const timeAgo = formatDistanceToNow(new Date(currentPost.created_at), { addSuffix: true, locale: dateLocale });
 
   return (
-    <Card className="glass rounded-2xl shadow-card hover:shadow-card-hover transition-all duration-300 overflow-hidden border-border/50" dir="rtl">
+    <Card className="glass rounded-2xl shadow-card hover:shadow-card-hover transition-all duration-300 overflow-hidden border-border/50" dir={isRTL ? 'rtl' : 'ltr'}>
       <CardHeader className="pb-3 px-5 pt-5">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
@@ -131,8 +138,8 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
                   <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9 text-muted-foreground"><MoreHorizontal className="h-4.5 w-4.5" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="rounded-xl">
-                  <DropdownMenuItem onClick={() => setShowEditDialog(true)} className="rounded-lg"><Pencil className="h-4 w-4 ml-2" />تعديل المنشور</DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleDelete} className="text-destructive rounded-lg"><Trash2 className="h-4 w-4 ml-2" />حذف المنشور</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowEditDialog(true)} className="rounded-lg"><Pencil className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />{t('feed.editPost')}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDelete} className="text-destructive rounded-lg"><Trash2 className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />{t('feed.deletePost')}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -152,10 +159,10 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
 
       <CardFooter className="flex-col gap-3 pt-0 px-5 pb-5">
         <div className="flex items-center justify-between w-full text-sm text-muted-foreground pb-2.5 border-b border-border/50">
-          <span className="font-medium">{likes.length} إعجاب</span>
+          <span className="font-medium">{likes.length} {t('feed.likeCount')}</span>
           <div className="flex items-center gap-3">
-            <span>{comments.length} تعليق</span>
-            {shareCount > 0 && <span>{shareCount} مشاركة</span>}
+            <span>{comments.length} {t('feed.commentCount')}</span>
+            {shareCount > 0 && <span>{shareCount} {t('feed.shareCount')}</span>}
           </div>
         </div>
         
@@ -165,13 +172,13 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
             className={`rounded-xl flex-1 gap-2 h-10 font-medium transition-all ${isLiked ? 'text-destructive hover:text-destructive' : 'text-muted-foreground'}`}
           >
             <Heart className={`h-[18px] w-[18px] transition-all ${isLiked ? 'fill-current' : ''} ${likeAnimating ? 'scale-125' : 'scale-100'}`} />
-            إعجاب
+            {t('feed.like')}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setShowComments(!showComments)} className="rounded-xl flex-1 gap-2 h-10 font-medium text-muted-foreground">
-            <MessageCircle className="h-[18px] w-[18px]" />تعليق
+            <MessageCircle className="h-[18px] w-[18px]" />{t('feed.comment')}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setShowShareDialog(true)} className="rounded-xl flex-1 gap-2 h-10 font-medium text-muted-foreground">
-            <Share2 className="h-[18px] w-[18px]" />مشاركة
+            <Share2 className="h-[18px] w-[18px]" />{t('feed.share')}
           </Button>
         </div>
 
@@ -203,7 +210,7 @@ export default function PostCard({ post, currentUser, onDelete }: PostCardProps)
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 flex gap-2">
-                <Input placeholder="اكتب تعليقاً..." value={newComment} onChange={(e) => setNewComment(e.target.value)}
+                <Input placeholder={t('feed.writeComment')} value={newComment} onChange={(e) => setNewComment(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleComment()} className="bg-muted/60 border-0 rounded-xl h-9" />
                 <Button size="icon" onClick={handleComment} disabled={!newComment.trim()} className="rounded-xl h-9 w-9 gradient-primary text-primary-foreground shadow-glow">
                   <Send className="h-3.5 w-3.5" />

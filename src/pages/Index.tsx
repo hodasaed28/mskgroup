@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
 import { Post } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/layout/Header';
@@ -15,6 +17,8 @@ import { Loader2, Sparkles } from 'lucide-react';
 export default function Index() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -61,25 +65,23 @@ export default function Index() {
 
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Sidebar */}
           <aside className="hidden lg:block lg:col-span-3">
             <div className="sticky top-20">
               <FriendsSidebar currentUser={profile} />
             </div>
           </aside>
 
-          {/* Main Feed */}
           <main className="lg:col-span-6 space-y-5">
             <StoriesBar currentUser={profile} />
             <CreatePost profile={profile} onPostCreated={handlePostCreated} />
             
             {posts.length === 0 ? (
-              <div className="text-center py-16 animate-fade-in" dir="rtl">
+              <div className="text-center py-16 animate-fade-in" dir={isRTL ? 'rtl' : 'ltr'}>
                 <div className="w-20 h-20 gradient-primary rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-glow opacity-60">
                   <Sparkles className="h-9 w-9 text-primary-foreground" />
                 </div>
-                <p className="text-lg font-semibold text-foreground mb-1">لا توجد منشورات بعد</p>
-                <p className="text-sm text-muted-foreground">كن أول من ينشر شيئاً!</p>
+                <p className="text-lg font-semibold text-foreground mb-1">{t('feed.noPostsYet')}</p>
+                <p className="text-sm text-muted-foreground">{t('feed.beFirstToPost')}</p>
               </div>
             ) : (
               <div className="space-y-5">
@@ -92,13 +94,12 @@ export default function Index() {
             )}
           </main>
 
-          {/* Right Sidebar */}
           <aside className="hidden lg:block lg:col-span-3">
-            <div className="sticky top-20 space-y-5" dir="rtl">
+            <div className="sticky top-20 space-y-5" dir={isRTL ? 'rtl' : 'ltr'}>
               <TrendingHashtags />
               <div className="glass rounded-2xl p-5">
                 <p className="text-xs text-muted-foreground text-center">
-                  © 2026 MSK Group. All rights reserved.
+                  {t('app.copyright')}
                 </p>
               </div>
             </div>

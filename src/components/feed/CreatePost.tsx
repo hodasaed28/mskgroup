@@ -48,7 +48,7 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) { toast({ title: t('common.error'), description: 'Image must be less than 10MB', variant: 'destructive' }); return; }
+      if (file.size > 10 * 1024 * 1024) { toast({ title: t('common.error'), description: t('feed.imageTooLarge'), variant: 'destructive' }); return; }
       setImageFile(file); setImagePreview(URL.createObjectURL(file)); setVideoFile(null); setVideoPreview(null);
     }
   };
@@ -56,7 +56,7 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 50 * 1024 * 1024) { toast({ title: t('common.error'), description: 'Video must be less than 50MB', variant: 'destructive' }); return; }
+      if (file.size > 50 * 1024 * 1024) { toast({ title: t('common.error'), description: t('feed.videoTooLarge'), variant: 'destructive' }); return; }
       setVideoFile(file); setVideoPreview(URL.createObjectURL(file)); setImageFile(null); setImagePreview(null);
     }
   };
@@ -90,9 +90,9 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
       const { error } = await supabase.from('posts').insert({ user_id: profile.id, content: content.trim() || null, image_url: imageUrl, video_url: videoUrl, visibility });
       if (error) throw error;
       setContent(''); clearMedia(); setVisibility('everyone'); onPostCreated();
-      toast({ title: t('common.success'), description: 'Post published successfully' });
+      toast({ title: t('common.success'), description: t('feed.postPublished') });
     } catch (error: any) {
-      toast({ title: t('common.error'), description: error.message || 'Failed to publish post', variant: 'destructive' });
+      toast({ title: t('common.error'), description: error.message || t('feed.postFailed'), variant: 'destructive' });
     } finally { setIsLoading(false); }
   };
 
@@ -117,7 +117,7 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
           <div className="flex-1">
             <Textarea
               ref={textareaRef}
-              placeholder={`What's on your mind, ${profile?.full_name || profile?.username}?`}
+              placeholder={`${t('feed.whatsOnYourMind')}, ${profile?.full_name || profile?.username}?`}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="min-h-[80px] resize-none border-0 bg-muted/40 focus-visible:ring-0 text-base rounded-xl p-3"
@@ -152,9 +152,9 @@ export default function CreatePost({ profile, onPostCreated }: CreatePostProps) 
                     <div className="flex items-center gap-2">{getVisibilityIcon()}<SelectValue /></div>
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    <SelectItem value="everyone"><div className="flex items-center gap-2"><Globe className="h-4 w-4" />Everyone</div></SelectItem>
-                    <SelectItem value="friends"><div className="flex items-center gap-2"><Users className="h-4 w-4" />Friends</div></SelectItem>
-                    <SelectItem value="only_me"><div className="flex items-center gap-2"><Lock className="h-4 w-4" />Only me</div></SelectItem>
+                    <SelectItem value="everyone"><div className="flex items-center gap-2"><Globe className="h-4 w-4" />{t('feed.everyone')}</div></SelectItem>
+                    <SelectItem value="friends"><div className="flex items-center gap-2"><Users className="h-4 w-4" />{t('feed.friendsOnly')}</div></SelectItem>
+                    <SelectItem value="only_me"><div className="flex items-center gap-2"><Lock className="h-4 w-4" />{t('feed.onlyMe')}</div></SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleSubmit} disabled={(!content.trim() && !imageFile && !videoFile) || isLoading} size="sm" className="rounded-xl gradient-primary text-primary-foreground shadow-glow h-9 px-4">
