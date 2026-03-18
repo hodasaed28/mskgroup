@@ -42,11 +42,54 @@ export function CreateGroupDialog({ open, onOpenChange, currentUser, onGroupCrea
     if (!name.trim()) { toast({ title: t('groups.nameRequired'), variant: 'destructive' }); return; }
     if (selectedFriends.length === 0) { toast({ title: t('groups.memberRequired'), variant: 'destructive' }); return; }
     setCreating(true);
-    const { data: group, error: groupError } = await supabase.from('group_chats').insert({ name: name.trim(), description: description.trim() || null, created_by: currentUser.id }).select().single();
-    if (groupError || !group) { toast({ title: t('groups.failed'), variant: 'destructive' }); setCreating(false); return; }
-    await supabase.from('group_chat_members').insert({ group_id: group.id, user_id: currentUser.id, role: 'admin' });
-    await supabase.from('group_chat_members').insert(selectedFriends.map((friendId) => ({ group_id: group.id, user_id: friendId, role: 'member' })));
-    toast({ title: t('groups.created') }); setCreating(false); onOpenChange(false); onGroupCreated?.();
+    
+    try {
+      // Step 1: Create the group
+      const { data: group, error: groupError } = await supabase
+        .from('group_chats')
+        .insert({ name: name.trim(), description: description.trim() || null, created_by: currentUser.id })
+        .select()
+        .single();
+      
+      if (groupError || !group) {
+        console.error('Group creation error:', groupError);
+        toast({ title: t('groups.failed'), description: groupError?.message, variant: 'destructive' });
+        setCreating(false);
+        return;
+      }
+
+      // Step 2: Add creator as admin
+      const { error: adminError } = await supabase
+        .from('group_chat_members')
+        .insert({ group_id: group.id, user_id: currentUser.id, role: 'admin' });
+      
+      if (adminError) {
+        console.error('Admin insert error:', adminError);
+        toast({ title: t('groups.failed'), description: adminError.message, variant: 'destructive' });
+        setCreating(false);
+        return;
+      }
+
+      // Step 3: Add members one by one to avoid batch RLS issues
+      for (const friendId of selectedFriends) {
+        const { error: memberError } = await supabase
+          .from('group_chat_members')
+          .insert({ group_id: group.id, user_id: friendId, role: 'member' });
+        
+        if (memberError) {
+          console.error('Member insert error:', memberError, friendId);
+        }
+      }
+
+      toast({ title: t('groups.created') });
+      onOpenChange(false);
+      onGroupCreated?.();
+    } catch (error: any) {
+      console.error('Unexpected error:', error);
+      toast({ title: t('groups.failed'), description: error.message, variant: 'destructive' });
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
