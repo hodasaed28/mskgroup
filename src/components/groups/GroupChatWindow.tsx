@@ -98,7 +98,7 @@ export function GroupChatWindow({ group, currentUser, onClose }: GroupChatWindow
           </Avatar>
           <div>
             <p className="font-semibold">{group.name}</p>
-            <p className="text-xs opacity-80">{members.length} {t('groups.membersCount')}</p>
+            <p className="text-xs opacity-80">{members.length} {t('groups.members')}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
